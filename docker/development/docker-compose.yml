@@ -1,0 +1,167 @@
+name: setive-erp-dev
+
+x-customizable-image: &customizable_image
+  image: frappe/erpnext:v16.33.0
+  restart: unless-stopped
+
+x-depends-on-configurator: &depends_on_configurator
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+
+x-backend-defaults: &backend_defaults
+  <<: [*depends_on_configurator, *customizable_image]
+  volumes:
+    - sites-data:/home/frappe/frappe-bench/sites
+    # sites/assets 는 컨테이너 레이어(/home/frappe/frappe-bench/assets)를 가리키는 심볼릭
+    # 링크라 컨테이너를 재생성하면 컴파일한 MO 가 이미지 원본으로 되돌아간다. 번역
+    # 바이너리만 볼륨으로 분리해 configurator 가 컴파일한 결과를 전 컨테이너가 공유한다.
+    - locale-data:/home/frappe/frappe-bench/assets/locale
+    - ../../:/home/frappe/frappe-bench/apps/erpnext
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    container_name: setive-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-file-per-table=1
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-padmin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-cache:
+    image: redis:7-alpine
+    container_name: setive-redis-cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-queue:
+    image: redis:7-alpine
+    container_name: setive-redis-queue
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  configurator:
+    <<: *customizable_image
+    container_name: setive-configurator
+    volumes:
+      - sites-data:/home/frappe/frappe-bench/sites
+      - locale-data:/home/frappe/frappe-bench/assets/locale
+      - ../../:/home/frappe/frappe-bench/apps/erpnext
+    entrypoint:
+      - bash
+      - -c
+      - |
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host mariadb;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache redis://redis-cache:6379;
+        bench set-config -g redis_queue redis://redis-queue:6379;
+        bench set-config -g redis_socketio redis://redis-queue:6379;
+        bench set-config -gp socketio_port 9000;
+        bench set-config -g developer_mode 1;
+        if [ ! -d /home/frappe/frappe-bench/sites/localhost ]; then
+          echo "Initializing site localhost..."
+          bench new-site localhost \
+            --db-host mariadb \
+            --db-port 3306 \
+            --mariadb-root-password admin \
+            --admin-password admin \
+            --no-mariadb-socket \
+            --install-app erpnext \
+            --set-default
+          echo "Site localhost initialized successfully."
+        else
+          echo "Site localhost already exists."
+        fi
+        echo "Applying regional defaults and compiling ko translations...";
+        bench --site localhost execute erpnext.setup.install.configure_target_languages;
+        bench --site localhost execute frappe.gettext.translate.compile_translations --kwargs "{'locale': 'ko', 'force': True}";
+        bench --site localhost clear-cache;
+        echo "Bootstrap complete.";
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      redis-queue:
+        condition: service_healthy
+    restart: on-failure
+
+  backend:
+    <<: *backend_defaults
+    container_name: setive-backend
+    environment:
+      GUNICORN_THREADS: 4
+      GUNICORN_WORKERS: 2
+      GUNICORN_TIMEOUT: 120
+
+  frontend:
+    <<: *customizable_image
+    container_name: setive-frontend
+    command:
+      - nginx-entrypoint.sh
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: $$host
+      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 50m
+    ports:
+      - "8000:8080"
+    volumes:
+      - sites-data:/home/frappe/frappe-bench/sites
+      - ../../:/home/frappe/frappe-bench/apps/erpnext
+    depends_on:
+      - backend
+      - websocket
+
+  websocket:
+    <<: *backend_defaults
+    container_name: setive-websocket
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+
+  queue-short:
+    <<: *backend_defaults
+    container_name: setive-queue-short
+    command: bench worker --queue short,default
+
+  queue-long:
+    <<: *backend_defaults
+    container_name: setive-queue-long
+    command: bench worker --queue long,default,short
+
+  scheduler:
+    <<: *backend_defaults
+    container_name: setive-scheduler
+    command: bench schedule
+
+volumes:
+  mariadb-data:
+  sites-data:
+  # 컴파일된 gettext MO 전용. 이미지 업그레이드 시에도 configurator 가 매 기동마다
+  # ko.po 기준으로 다시 컴파일하므로 별도 정리가 필요 없다.
+  locale-data:

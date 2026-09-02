@@ -1,3 +1,8 @@
+> **SETIVE ERP 프로젝트 문서 안내**
+>
+> 본 프로젝트의 목표(한글화, 한국화 Custom App, 온톨로지 스키마 정의) 및 배포/운영 전략에 대한 상세 내용은 [SETIVE-README.md](./SETIVE-README.md)에서 확인하실 수 있습니다.
+
+---
 
 <div align="center">
     <a href="https://frappe.io/erpnext">

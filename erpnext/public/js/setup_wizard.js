@@ -7,7 +7,48 @@ frappe.pages["setup-wizard"].on_page_load = function (wrapper) {
 	}
 };
 
+frappe.provide("frappe.setup.utils");
+
+// frappe.setup.utils 는 코어 setup_wizard.js 에서 통째로 재할당되므로, 이 파일이
+// 먼저 평가되면 래핑이 유실된다. setup_wizard_requires 로 주입되는 이 파일은 항상
+// 코어 페이지 스크립트 이후에 로드된다는 전제를 지킬 것.
+const original_setup_language_field = frappe.setup.utils.setup_language_field;
+
+frappe.setup.utils.setup_language_field = function (slide) {
+	// 코어 load_prefilled_data() 는 System Settings 의 언어 "코드"(예: "ko")를
+	// frappe.wizard.values.language 에 넣지만, Autocomplete 옵션의 value 는
+	// 언어 "라벨명"(예: "한국어")이라 그대로 두면 매칭에 실패한다. 여기서 환산한다.
+	const codes_to_names = frappe.setup.data.lang?.codes_to_names || {};
+	let val = frappe.wizard?.values?.language;
+
+	if (codes_to_names[val]) {
+		val = codes_to_names[val];
+	} else if (!val) {
+		val = frappe.setup.data.lang?.default_language;
+	}
+
+	if (val && frappe.wizard) {
+		// 정규화된 라벨명을 되돌려주면 코어가 df.default 와 set_input 을 알아서 처리한다.
+		frappe.wizard.values.language = val;
+	}
+
+	if (original_setup_language_field) {
+		original_setup_language_field.call(this, slide);
+	}
+};
+
 frappe.setup.on("before_load", function () {
+	// 슬라이드가 만들어지기 전에 기본 언어를 심어둔다. default_language 는 서버가
+	// System Settings 기준으로 계산해 내려주므로 특정 언어를 하드코딩하지 않는다.
+	const welcome_slide = frappe.setup.slides_settings.find((s) => s.name === "welcome");
+	if (welcome_slide) {
+		const lang_field = welcome_slide.fields?.find((f) => f.fieldname === "language");
+		const target_default = frappe.wizard?.values?.language || frappe.setup.data.lang?.default_language;
+		if (lang_field && target_default) {
+			lang_field.default = target_default;
+		}
+	}
+
 	if (
 		frappe.boot.setup_wizard_completed_apps?.length &&
 		frappe.boot.setup_wizard_completed_apps.includes("erpnext")

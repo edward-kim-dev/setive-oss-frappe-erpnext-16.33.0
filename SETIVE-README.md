@@ -29,6 +29,17 @@
 
 ---
 
+## 📚 문서 (Documentation)
+
+설계·구현 지식은 [`docs/`](./docs/) 에 있습니다. 진입점은 [`docs/README.md`](./docs/README.md) 이며, 문서 작성 규약도 같은 곳에 있습니다.
+
+| 갈래 | 경로 | 성격 |
+|---|---|---|
+| **KB** | [`docs/kb/`](./docs/kb/) | 코드에 결합된 구현 지식 (아키텍처·한글화·한국화·개발 도구) |
+| **ONT** | [`docs/ontology/`](./docs/ontology/) | 코드에서 독립된 도메인 개념 모델. 위 3번 온톨로지 스키마 설계의 입력물 |
+
+---
+
 ## 배포 및 운영 전략 (Deployment & Operations)
 
 ```

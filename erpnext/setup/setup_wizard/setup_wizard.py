@@ -61,6 +61,8 @@ def capture_user_persona(args):  # nosemgrep
 		properties={
 			"implementing_for": args.get("persona_implementing_for"),
 			"company_size": args.get("persona_company_size"),
+			# 한국표준산업분류(KSIC) 제11차 대분류 코드(A~U). 옵션 정의는
+			# erpnext/public/js/setup_wizard.js 의 erpnext.setup.ksic_sections 참조.
 			"industry": args.get("persona_industry"),
 			"current_system": args.get("persona_current_system"),
 			"module_accounting": bool(args.get("module_accounting")),

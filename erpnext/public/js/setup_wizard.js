@@ -59,6 +59,49 @@ frappe.setup.on("before_load", function () {
 	erpnext.setup.slides_settings.map(frappe.setup.add_slide);
 });
 
+// 한국표준산업분류(KSIC) 제11차 개정 대분류 21개 — 2024-07-01 시행, 국가데이터처 고시.
+// 옵션 값은 명칭이 아니라 대분류 코드(A~U)다. 개정으로 명칭이 바뀌어도 저장된 값과
+// industry_modules 매핑이 깨지지 않고, 이후 세세분류·국세청 업종코드로 내려갈 때 그대로
+// 조인 키로 쓸 수 있다. 라벨은 "KSIC" 컨텍스트로 번역한다 — 컨텍스트가 없으면
+// "Manufacturing" 같은 msgid 가 ERPNext 모듈명 번역("조작")과 충돌한다.
+erpnext.setup.ksic_sections = [
+	{ value: "A", label: __("Agriculture, forestry and fishing", null, "KSIC") }, // 농업, 임업 및 어업
+	{ value: "B", label: __("Mining and quarrying", null, "KSIC") }, // 광업
+	{ value: "C", label: __("Manufacturing", null, "KSIC") }, // 제조업
+	{ value: "D", label: __("Electricity, gas, steam and air conditioning supply", null, "KSIC") }, // 전기, 가스, 증기 및 공기 조절 공급업
+	{ value: "E", label: __("Water supply; sewage, waste management and materials recovery", null, "KSIC") }, // 수도, 하수 및 폐기물 처리, 원료 재생업
+	{ value: "F", label: __("Construction", null, "KSIC") }, // 건설업
+	{ value: "G", label: __("Wholesale and retail trade", null, "KSIC") }, // 도매 및 소매업
+	{ value: "H", label: __("Transportation and storage", null, "KSIC") }, // 운수 및 창고업
+	{ value: "I", label: __("Accommodation and food service activities", null, "KSIC") }, // 숙박 및 음식점업
+	{ value: "J", label: __("Information and communication", null, "KSIC") }, // 정보통신업
+	{ value: "K", label: __("Financial and insurance activities", null, "KSIC") }, // 금융 및 보험업
+	{ value: "L", label: __("Real estate activities", null, "KSIC") }, // 부동산업
+	{ value: "M", label: __("Professional, scientific and technical activities", null, "KSIC") }, // 전문, 과학 및 기술 서비스업
+	{
+		value: "N",
+		label: __(
+			"Business facilities management and business support services; rental and leasing activities",
+			null,
+			"KSIC"
+		),
+	}, // 사업시설 관리, 사업 지원 및 임대 서비스업
+	{ value: "O", label: __("Public administration and defence; compulsory social security", null, "KSIC") }, // 공공 행정, 국방 및 사회보장 행정
+	{ value: "P", label: __("Education", null, "KSIC") }, // 교육 서비스업
+	{ value: "Q", label: __("Human health and social work activities", null, "KSIC") }, // 보건업 및 사회복지 서비스업
+	{ value: "R", label: __("Arts, sports and recreation related services", null, "KSIC") }, // 예술, 스포츠 및 여가관련 서비스업
+	{ value: "S", label: __("Membership organizations, repair and other personal services", null, "KSIC") }, // 협회 및 단체, 수리 및 기타 개인 서비스업
+	{
+		value: "T",
+		label: __(
+			"Activities of households as employers; undifferentiated goods- and services-producing activities of households for own use",
+			null,
+			"KSIC"
+		),
+	}, // 가구내 고용활동 및 달리 분류되지 않은 자가소비 생산활동
+	{ value: "U", label: __("Activities of extraterritorial organizations and bodies", null, "KSIC") }, // 국제 및 외국기관
+];
+
 erpnext.setup.slides_settings = [
 	{
 		// Persona — help us tailor the setup
@@ -87,22 +130,7 @@ erpnext.setup.slides_settings = [
 				fieldname: "persona_industry",
 				label: __("What kind of work do you do?"),
 				fieldtype: "Select",
-				options: [
-					"",
-					"Manufacturing",
-					"Retail",
-					"Wholesale / Distribution",
-					"E-commerce",
-					"Services / Consulting",
-					"Construction / Real Estate",
-					"Technology / Software",
-					"Healthcare",
-					"Education",
-					"Agriculture",
-					"Food & Beverage",
-					"Non Profit",
-					"Other",
-				].join("\n"),
+				options: [{ value: "", label: "" }].concat(erpnext.setup.ksic_sections),
 				reqd: 1,
 			},
 			{
@@ -380,21 +408,30 @@ erpnext.setup.slides_settings = [
 ];
 
 // Modules pre-selected on the persona slide based on the chosen industry.
-// Keys must match the persona_industry option values. Accounting is always on.
+// Keys are KSIC section codes and must match the persona_industry option values.
+// Accounting is always on; an unmapped value falls back to accounting only.
 erpnext.setup.industry_modules = {
-	Manufacturing: ["accounting", "stock", "manufacturing"],
-	Retail: ["accounting", "stock"],
-	"Wholesale / Distribution": ["accounting", "stock"],
-	"E-commerce": ["accounting", "stock"],
-	"Services / Consulting": ["accounting", "projects"],
-	"Construction / Real Estate": ["accounting", "stock", "projects"],
-	"Technology / Software": ["accounting", "projects"],
-	Healthcare: ["accounting", "stock"],
-	Education: ["accounting", "projects"],
-	Agriculture: ["accounting", "stock"],
-	"Food & Beverage": ["accounting", "stock", "manufacturing"],
-	"Non Profit": ["accounting", "projects"],
-	Other: ["accounting"],
+	A: ["accounting", "stock"], // 농업, 임업 및 어업
+	B: ["accounting", "stock"], // 광업
+	C: ["accounting", "stock", "manufacturing"], // 제조업
+	D: ["accounting", "stock"], // 전기, 가스, 증기 및 공기 조절 공급업
+	E: ["accounting", "stock"], // 수도, 하수 및 폐기물 처리, 원료 재생업
+	F: ["accounting", "stock", "projects"], // 건설업
+	G: ["accounting", "stock"], // 도매 및 소매업
+	H: ["accounting", "stock"], // 운수 및 창고업
+	I: ["accounting", "stock"], // 숙박 및 음식점업
+	J: ["accounting", "projects"], // 정보통신업
+	K: ["accounting"], // 금융 및 보험업
+	L: ["accounting", "projects"], // 부동산업
+	M: ["accounting", "projects"], // 전문, 과학 및 기술 서비스업
+	N: ["accounting", "projects"], // 사업시설 관리, 사업 지원 및 임대 서비스업
+	O: ["accounting", "projects"], // 공공 행정, 국방 및 사회보장 행정
+	P: ["accounting", "projects"], // 교육 서비스업
+	Q: ["accounting", "stock"], // 보건업 및 사회복지 서비스업
+	R: ["accounting", "projects"], // 예술, 스포츠 및 여가관련 서비스업
+	S: ["accounting", "stock"], // 협회 및 단체, 수리 및 기타 개인 서비스업
+	T: ["accounting"], // 가구내 고용활동 및 달리 분류되지 않은 자가소비 생산활동
+	U: ["accounting", "projects"], // 국제 및 외국기관
 };
 
 // Source: https://en.wikipedia.org/wiki/Fiscal_year

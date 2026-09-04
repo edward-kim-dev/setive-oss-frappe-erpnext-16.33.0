@@ -1300,6 +1300,11 @@ msgstr ""
 msgid "Access Key is required for Service Provider: {0}"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:76
+msgctxt "KSIC"
+msgid "Accommodation and food service activities"
+msgstr ""
+
 #. Description of the 'Common Code' (Data) field in DocType 'UOM'
 #: erpnext/setup/doctype/uom/uom.json
 msgid "According to CEFACT/ICG/2010/IC013 or CEFACT/ICG/2010/IC010"
@@ -2440,6 +2445,16 @@ msgstr ""
 #: erpnext/crm/doctype/opportunity/opportunity.json
 #: erpnext/crm/doctype/prospect/prospect.json
 msgid "Activities"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:97
+msgctxt "KSIC"
+msgid "Activities of households as employers; undifferentiated goods- and services-producing activities of households for own use"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:102
+msgctxt "KSIC"
+msgid "Activities of extraterritorial organizations and bodies"
 msgstr ""
 
 #. Name of a DocType
@@ -3781,6 +3796,11 @@ msgstr ""
 
 #: erpnext/setup/setup_wizard/data/industry_type.txt:4
 msgid "Agriculture"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:68
+msgctxt "KSIC"
+msgid "Agriculture, forestry and fishing"
 msgstr ""
 
 #: erpnext/setup/setup_wizard/data/industry_type.txt:5
@@ -5627,6 +5647,11 @@ msgstr ""
 #. Name of a UOM
 #: erpnext/setup/setup_wizard/data/uom_data.json
 msgid "Arshin"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:92
+msgctxt "KSIC"
+msgid "Arts, sports and recreation related services"
 msgstr ""
 
 #: erpnext/stock/report/serial_no_ledger/serial_no_ledger.js:57
@@ -9170,6 +9195,11 @@ msgstr ""
 msgid "Business Development Manager"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:84
+msgctxt "KSIC"
+msgid "Business facilities management and business support services; rental and leasing activities"
+msgstr ""
+
 #. Option for the 'Status' (Select) field in DocType 'Call Log'
 #: erpnext/telephony/doctype/call_log/call_log.json
 msgid "Busy"
@@ -12285,6 +12315,11 @@ msgstr ""
 
 #: erpnext/accounts/report/consolidated_trial_balance/consolidated_trial_balance.py:157
 msgid "Consolidated Trial balance could not be generated as Exchange Rate from {0} to {1} is not available for {2}."
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:73
+msgctxt "KSIC"
+msgid "Construction"
 msgstr ""
 
 #. Option for the 'Lead Type' (Select) field in DocType 'Lead'
@@ -18596,6 +18631,11 @@ msgstr ""
 msgid "Education"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:90
+msgctxt "KSIC"
+msgid "Education"
+msgstr ""
+
 #. Label of the educational_qualification (Section Break) field in DocType
 #. 'Employee'
 #: erpnext/setup/doctype/employee/employee.json
@@ -18640,6 +18680,11 @@ msgstr ""
 #. Option for the 'Stop Reason' (Select) field in DocType 'Downtime Entry'
 #: erpnext/manufacturing/doctype/downtime_entry/downtime_entry.json
 msgid "Electricity down"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:71
+msgctxt "KSIC"
+msgid "Electricity, gas, steam and air conditioning supply"
 msgstr ""
 
 #: erpnext/accounts/doctype/account/chart_of_accounts/verified/standard_chart_of_accounts.py:48
@@ -20783,6 +20828,11 @@ msgstr ""
 
 #: erpnext/public/js/setup_wizard.js:143
 msgid "Financial Year Begins On"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:78
+msgctxt "KSIC"
+msgid "Financial and insurance activities"
 msgstr ""
 
 #. Description of the 'Ignore Account closing balance' (Check) field in DocType
@@ -23481,6 +23531,11 @@ msgstr ""
 msgid "Human Resources"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:91
+msgctxt "KSIC"
+msgid "Human health and social work activities"
+msgstr ""
+
 #. Name of a UOM
 #: erpnext/setup/setup_wizard/data/uom_data.json
 msgid "Hundredweight (UK)"
@@ -25053,6 +25108,11 @@ msgstr ""
 #. Name of a DocType
 #: erpnext/selling/doctype/industry_type/industry_type.json
 msgid "Industry Type"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:77
+msgctxt "KSIC"
+msgid "Information and communication"
 msgstr ""
 
 #. Label of the email_notification_sent (Check) field in DocType 'Delivery
@@ -30274,6 +30334,11 @@ msgstr ""
 msgid "Manufacturing"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:70
+msgctxt "KSIC"
+msgid "Manufacturing"
+msgstr ""
+
 #. Label of the semi_fg_bom (Link) field in DocType 'Job Card'
 #: erpnext/manufacturing/doctype/job_card/job_card.json
 msgid "Manufacturing BOM"
@@ -31082,6 +31147,11 @@ msgstr ""
 msgid "Megawatt"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:93
+msgctxt "KSIC"
+msgid "Membership organizations, repair and other personal services"
+msgstr ""
+
 #: erpnext/stock/stock_ledger.py:2098
 msgid "Mention Valuation Rate in the Item master."
 msgstr ""
@@ -31437,6 +31507,11 @@ msgstr ""
 #. Description of the 'Safety Stock' (Float) field in DocType 'Item'
 #: erpnext/stock/doctype/item/item.json
 msgid "Minimum stock level to maintain as a buffer. Used to calculate recommended reorder level: Reorder Level = Safety Stock + (Average Daily Consumption × Lead Time)."
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:69
+msgctxt "KSIC"
+msgid "Mining and quarrying"
 msgstr ""
 
 #. Label of the minute (Text Editor) field in DocType 'Quality Meeting Minutes'
@@ -40652,6 +40727,11 @@ msgstr ""
 msgid "Products"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:80
+msgctxt "KSIC"
+msgid "Professional, scientific and technical activities"
+msgstr ""
+
 #. Label of the accounts_module (Column Break) field in DocType 'Email Digest'
 #: erpnext/setup/doctype/email_digest/email_digest.json
 msgid "Profit & Loss"
@@ -41090,6 +41170,11 @@ msgstr ""
 #. Name of a UOM
 #: erpnext/setup/setup_wizard/data/uom_data.json
 msgid "Psi/1000 Feet"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:89
+msgctxt "KSIC"
+msgid "Public administration and defence; compulsory social security"
 msgstr ""
 
 #. Label of the publish_date (Date) field in DocType 'Video'
@@ -43430,6 +43515,11 @@ msgstr ""
 
 #: erpnext/setup/setup_wizard/data/industry_type.txt:40
 msgid "Real Estate"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:79
+msgctxt "KSIC"
+msgid "Real estate activities"
 msgstr ""
 
 #. Label of the hold_comment (Small Text) field in DocType 'Purchase Invoice'
@@ -58359,6 +58449,11 @@ msgstr ""
 msgid "Transportation"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:75
+msgctxt "KSIC"
+msgid "Transportation and storage"
+msgstr ""
+
 #. Label of the transporter (Link) field in DocType 'Driver'
 #. Label of the transporter (Link) field in DocType 'Delivery Note'
 #. Label of the transporter_info (Section Break) field in DocType 'Purchase
@@ -61150,6 +61245,11 @@ msgstr ""
 msgid "Watch Video"
 msgstr ""
 
+#: erpnext/public/js/setup_wizard.js:72
+msgctxt "KSIC"
+msgid "Water supply; sewage, waste management and materials recovery"
+msgstr ""
+
 #. Name of a UOM
 #: erpnext/setup/setup_wizard/data/uom_data.json
 msgid "Watt"
@@ -61427,6 +61527,11 @@ msgstr ""
 
 #: erpnext/public/js/setup_wizard.js:31
 msgid "Who are you setting this up for?"
+msgstr ""
+
+#: erpnext/public/js/setup_wizard.js:74
+msgctxt "KSIC"
+msgid "Wholesale and retail trade"
 msgstr ""
 
 #. Option for the 'Marital Status' (Select) field in DocType 'Employee'

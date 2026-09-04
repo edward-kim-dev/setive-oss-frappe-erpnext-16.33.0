@@ -18,6 +18,11 @@ x-backend-defaults: &backend_defaults
     # 바이너리만 볼륨으로 분리해 configurator 가 컴파일한 결과를 전 컨테이너가 공유한다.
     - locale-data:/home/frappe/frappe-bench/assets/locale
     - ../../:/home/frappe/frappe-bench/apps/erpnext
+    - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+    # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
+    # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
+    # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.
+    - erpnext-dist:/home/frappe/frappe-bench/apps/erpnext/erpnext/public/dist
 
 services:
   mariadb:
@@ -66,6 +71,11 @@ services:
       - sites-data:/home/frappe/frappe-bench/sites
       - locale-data:/home/frappe/frappe-bench/assets/locale
       - ../../:/home/frappe/frappe-bench/apps/erpnext
+      - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+      # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
+      # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
+      # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.
+      - erpnext-dist:/home/frappe/frappe-bench/apps/erpnext/erpnext/public/dist
     entrypoint:
       - bash
       - -c
@@ -133,6 +143,11 @@ services:
     volumes:
       - sites-data:/home/frappe/frappe-bench/sites
       - ../../:/home/frappe/frappe-bench/apps/erpnext
+      - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+      # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
+      # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
+      # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.
+      - erpnext-dist:/home/frappe/frappe-bench/apps/erpnext/erpnext/public/dist
     depends_on:
       - backend
       - websocket
@@ -165,3 +180,7 @@ volumes:
   # 컴파일된 gettext MO 전용. 이미지 업그레이드 시에도 configurator 가 매 기동마다
   # ko.po 기준으로 다시 컴파일하므로 별도 정리가 필요 없다.
   locale-data:
+  # 이미지의 erpnext/public/dist 를 담는다. 최초 마운트 시 Docker 가 이미지
+  # 레이어의 내용을 볼륨으로 복사한다. 이미지 태그를 올린 뒤에는 이 볼륨을
+  # 삭제해야 새 자산이 반영된다(docker volume rm setive-erp-dev_erpnext-dist).
+  erpnext-dist:

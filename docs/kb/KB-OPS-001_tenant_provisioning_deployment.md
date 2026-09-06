@@ -9,7 +9,7 @@ applies_to:
   - docker/development/docker-compose.yml
 verified_on: 2026-09-04
 verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교)
-related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002]
+related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002, KB-KOR-003]
 ---
 
 # KB-OPS-001: 테넌트 프로비저닝·배포 파이프라인
@@ -279,6 +279,8 @@ docker compose -f "$COMPOSE" restart backend queue-short queue-long scheduler fr
 # 1. 소스 배포                     ★ migrate보다 반드시 먼저
 # 2. bench --site $SITE install-app $APP     (신규 앱 최초 1회)
 # 3. bench --site $SITE migrate              ★ 생략 시 1의 결과가 반영되지 않음
+# 3a. 앱 설치 전에 만든 Company 가 있으면 한국화 백필 (사이트당 회사마다 1회, 멱등)
+#     bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill --kwargs "{'company':'<회사명>'}"
 # 4. 번역 컴파일 (변경 시)
 # 5. bench --site $SITE clear-cache
 # 6. 컨테이너 재기동 (§5.3)
@@ -286,6 +288,8 @@ docker compose -f "$COMPOSE" restart backend queue-short queue-long scheduler fr
 ```
 
 **1과 3의 순서를 바꾸면 데이터가 삭제됩니다** (§7.1).
+
+**3a는 기존 사이트에 앱을 나중에 설치했을 때만 필요합니다.** 앱의 한국화 설정(Company 기본계정·창고 계정·부가세 템플릿·국세청 표준코드)은 `Company.on_update` 훅으로 적용되므로 앱 설치 후 만든 회사는 자동으로 처리되지만, 설치 전에 만든 회사는 훅이 돌지 않은 상태로 남습니다. `backfill` 은 빈 값만 채우는 멱등 명령이라 이미 적용된 회사에 다시 실행해도 변경이 없습니다. 3(migrate)보다 뒤여야 합니다 — `after_migrate` 가 만드는 Custom Field 가 없으면 표준코드 단계가 throw 합니다. 절차·결과 해석은 [KB-KOR-003 §8](./KB-KOR-003_company_hook_tax_nts.md) 을 봅니다.
 
 번역 컴파일은 개발 환경에서 [`Makefile`](../../Makefile)의 `make po`가 수행하는 것과 같은 절차입니다 (KB-DEV-001, KB-LOC-002). 앱별로 지정하려면:
 
@@ -309,7 +313,7 @@ bench --site "$SITE" execute frappe.gettext.translate.compile_translations \
 | `scheduler_events` 훅 | ❌ (부분) | 재기동 + `bench migrate` |
 | `locale/*.po` | ❌ | `compile_translations` + `clear-cache` |
 | `public/js/*.bundle.js` | ❌ | `bench build` — **현 이미지에 node 미포함으로 실행 불가** (§8.1) |
-| 신규 앱 | ❌ | `apps.txt` 등재 → `install-app` → `migrate` → 재기동 |
+| 신규 앱 | ❌ | `apps.txt` 등재 → `install-app` → `migrate` → 재기동. 기존 Company 가 있으면 `backfill` (§5.1 3a) |
 
 `scheduler_events`는 재기동 시 훅 자체는 로드되지만 `Scheduled Job Type` 레코드가 생성되지 않아 배치가 실행되지 않습니다. 오류가 발생하지 않으므로 탐지가 어렵습니다.
 
@@ -504,3 +508,4 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8000/
 - **`developer_mode`가 꺼져 있다는 최초 판단은 오류였습니다.** `sites/localhost/site_config.json`만 확인한 결과이며, 실제 값은 `sites/common_site_config.json`의 `"developer_mode": 1`입니다. 설정 확인은 반드시 `common_site_config.json`을 함께 봐야 합니다.
 - **`sites/apps.txt` 수동 편집이 필요하다는 초기 서술을 철회합니다.** configurator entrypoint의 `ls -1 apps > sites/apps.txt`가 자동 생성하므로, 마운트 추가 후 스택 재기동만으로 등재됩니다 (§1.3).
 - 초판은 **앱의 pip 설치 단계를 누락**했습니다. 마운트와 `apps.txt` 등재만으로는 `bench`가 앱을 import하지 못합니다. §1.4로 보강했습니다.
+- §5.1 초판은 `install-app` → `migrate` 만으로 배포가 끝나는 것처럼 읽혔습니다. 앱의 Company 훅은 회사 저장 시에만 실행되므로 **앱 설치 전에 만든 회사에는 한국화 기본값이 적용되지 않습니다.** 3a 단계(`backfill`)를 추가했습니다 (2026-09-06, KB-KOR-003 §8 실측).

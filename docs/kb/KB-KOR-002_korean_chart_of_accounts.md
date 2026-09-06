@@ -7,8 +7,8 @@ applies_to:
   - erpnext@16.33.0
   - frappe@v16
 verified_on: 2026-09-06
-verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판으로 Company 생성·측정·삭제 완료, 324계정판은 로더·트리 렌더 확인)
-related: [KB-OPS-001, KB-KOR-001, ONT-CLS-001]
+verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판·324계정판 모두 Company 생성·측정·삭제 완료. 324판은 KB-KOR-003 E2E 에서 수행)
+related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 ---
 
 # KB-KOR-002: 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑
@@ -227,7 +227,9 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
   | python3 -c "import sys,json; r=sys.stdin.read(); d=json.loads(r[r.find('['):r.rfind(']')+1]); v=[x['value'] for x in d]; print('nodes',len(d),'expandable',sum(1 for x in d if x.get('expandable')),'dup',len(v)-len(set(v)))"
 ```
 
-2026-09-06 실측: 321계정판으로 Company 생성·측정·삭제 완료(§12). 이후 단일 손익계정 3개를 더해 324계정이 됐고, 이 판은 정적 검사 errors 0 · warnings 0, 목록 노출, 트리 렌더 324/52/0 을 확인했다. 324판의 Company 생성 실측은 Company 훅 검증(KB-KOR-003)에서 함께 수행한다.
+2026-09-06 실측: 321계정판으로 Company 생성·측정·삭제 완료(§12). 이후 단일 손익계정 3개를 더해 324계정이 됐고, 이 판은 정적 검사 errors 0 · warnings 0, 목록 노출, 트리 렌더 324/52/0 을 확인했다.
+
+**324판 Company 생성 실측 (2026-09-06, [KB-KOR-003 §9](./KB-KOR-003_company_hook_tax_nts.md))**: Account 324(그룹 52 · 원장 272), 코어 자동 매핑은 §12 의 19개 + `round_off_for_opening` 2174(타입 매칭), 앱 훅이 12개(§11-1)·창고 계정 4개·세금 템플릿 12개·표준코드 272건을 추가, 1172/2151 중복 생성 0, Error Log 증가 0, 삭제 후 잔여 0.
 
 ```bash
 # Company 생성 실측(트랜잭션 후 삭제). 위저드 미완료 사이트에서는 Warehouse Type 'Transit' 이 먼저 있어야 한다 (§9-9)
@@ -239,15 +241,16 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 
 | # | 과제 | 위치 | 비고 |
 |---|---|---|---|
-| 1 | **Company 훅** — `hooks.doc_events["Company"]["on_update"]` 에서 `account_number` 로 기본계정 고정: `default_receivable_account`=1131, `default_payable_account`=2111, `default_cash_account`=1111, `default_bank_account`=1115, `default_inventory_account`=1155, `default_expense_account`=5120, `default_income_account`=4111, `depreciation_expense_account`=5311, `accumulated_depreciation_account`=1243, `write_off_account`=5480, `bank_charges_account`=5322, `exchange_gain_account`=4250, `exchange_loss_account`=5420, `round_off_for_opening`=2174, `default_discount_account`=4191 | `setive_erpnext_kr/korea/common/` | `erpnext/hooks.py` 에 `Company` 키가 없어 경합 없음. 훅이 있으면 JSON 형제 순서 의존이 사라진다 |
-| 2 | 창고 계정 매핑 — `Stores`→1155 원재료, `Work In Progress`→1154 재공품, `Finished Goods`→1152 제품, `Goods In Transit`→1158 미착품 | 같은 훅 | 결함 22 |
-| 3 | 부가세 템플릿 — 매출 10%(2151 부가세예수금), 매입 10%(1172 부가세대급금), 영세·면세 | `after_insert` 훅 | §9-4. 계정은 번호로 찾는다 |
+| 1 | **Company 훅** — `hooks.doc_events["Company"]["on_update"]` 에서 `account_number` 로 기본계정 고정: `default_receivable_account`=1131, `default_payable_account`=2111, `default_cash_account`=1111, `default_bank_account`=1115, `default_inventory_account`=1155, `default_expense_account`=5120, `default_income_account`=4111, `depreciation_expense_account`=5311, `accumulated_depreciation_account`=1243, `write_off_account`=5480, `bank_charges_account`=5322, `exchange_gain_account`=4250, `exchange_loss_account`=5420, `round_off_for_opening`=2174, `default_discount_account`=4191 | `setive_erpnext_kr/korea/common/company_defaults.py` | **완료 → [KB-KOR-003 §4](./KB-KOR-003_company_hook_tax_nts.md)**. 범위가 계획과 다르다 — 코어가 타입 매칭으로 채우는 필드(1131·2111·1111·1115·1155·5120·4111·5311·1243·2174)는 훅이 건드리지 않고 **빈 12개**(5480·5322·5422·4250·5420·5423·5452·2142·1174·4191·5251·2162)만 채운다. JSON 형제 순서 의존(§6.1)은 그대로 유효하다(§12) |
+| 2 | 창고 계정 매핑 — `Stores`→1155 원재료, `Work In Progress`→1154 재공품, `Finished Goods`→1152 제품, `Goods In Transit`→1158 미착품 | `korea/common/warehouses.py` | **완료 → KB-KOR-003 §5**. Company `default_wip/fg/in_transit_warehouse` 도 채운다. 결함 22 |
+| 3 | 부가세 템플릿 — 매출 10%(2151 부가세예수금), 매입 10%(1172 부가세대급금), 영세·면세 | `korea/common/taxes.py` + `data/kr_tax_defaults.json` (`on_update` 훅, `after_insert` 아님) | **완료 → KB-KOR-003 §6**. 매출 3·매입 6(불공제 3 포함)·품목 3·Tax Category 2. 면세 템플릿의 세율 0 행은 승인 대기. §9-4 |
 | 4 | Company Custom Field — 사업자등록번호·법인등록번호·주업종코드(KB-KOR-001 로드맵 3) | `custom/company.json` (`export_customizations`, KB-OPS-001 §4.1) | `sync_on_migrate:True` 필수 |
-| 5 | 선급금 1144 `Payable`·선수금 2141 `Receivable` 타입 부여 + `default_advance_paid/received_account` 지정 | JSON + 훅 | **훅(1) 배치 이후에만.** 순서를 어기면 `default_receivable_account` 가 선수금이 된다 |
+| 5 | 선급금 1144 `Payable`·선수금 2141 `Receivable` 타입 부여 + `default_advance_paid/received_account` 지정 | JSON + 훅 | **보류 — 사용자 결정(2026-09-06)** 으로 타입을 부여하지 않았고 훅은 `default_advance_*` 를 비워 둔다(KB-KOR-003 §4.2). 재개하려면 훅(1) 이 이미 있으므로 JSON 만 바꾸면 된다 |
 | 6 | 표준재무제표 리포트 — `computed`/`reconciliation` 실행기, 전표 단위 상대계정 산출 | 앱 리포트 | 테스트 원장으로 항등식 검증 |
-| 7 | 앱 `ko.po` 에 `Stores`·`Sales` 재정의 | `setive_erpnext_kr/locale/ko.po` | KB-LOC-003 규약 |
-| 8 | 외환차손익·유형자산처분손익 단일 계정 결정 | 사용자 | §9-3 |
+| 7 | 앱 `ko.po` 에 `Stores`·`Sales` 재정의 | `setive_erpnext_kr/locale/ko.po` | `Stores`→`창고` 완료(`ko.po:137`, KB-KOR-003 실측 `창고 - SHV`). `Sales` 는 미처리. KB-LOC-003 규약 |
+| 8 | 외환차손익·유형자산처분손익 단일 계정 결정 | 사용자 | **결정됨(§9-3, 2026-09-06)**. 훅이 5422/5423/5452 와 분리 필드 4250/5420 을 지정한다(KB-KOR-003 §4.1) |
 | 9 | K-IFRS 적용 테넌트 대응 검토 | — | 결정 1 에 따라 별도 벌은 만들지 않음. 필요 시 카테고리 확장으로 대응 |
+| 10 | 표준재무제표 코드를 Account 에 기록 — Custom Field(bs/is/mfg/role/note) + Company 매핑 개정 표식 | `korea/common/nts_codes.py` | **완료 → KB-KOR-003 §7**. 원장 272/272 채움, `force` 재적용·`report_unmapped` 점검 제공. 리포트 실행기(6)는 별개 |
 
 ## 12. 이전 서술 정정
 
@@ -257,4 +260,5 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 - 리뷰 전 매핑 규약 "매출원가·재료비는 영구재고 원장 잔액을 소계 행에 직접 배정" 은 폐기했다. 재료비는 재고에 흡수되어 이중계상되고 노무비·경비는 손익계산서에 도달하지 못했다(결함 1). 산식 행 `computed` 와 `reconcile_only` 로 대체.
 - 리뷰 전 매핑의 "차감계정은 서식의 괄호 행 코드에 대변잔액 그대로 배정" 은 `amount_convention` + `sign:-1` 로 형식화했다. 의미는 같다.
 - 리뷰안 중 채택하지 않은 것: 결함 7 의 교차 매핑(Income 계정 → 판관비 행 음수), 결함 10 의 5140 → mfg 39, 결함 11 의 1160 이동, 결함 3 의 리프 번호안(1160 을 유지하고 1161~1164 사용). 근거는 §8.
+- §11-1 초판은 "훅이 있으면 JSON 형제 순서 의존이 사라진다" 고 적었고 §8 결함 21 은 `round_off_for_opening`=2174 를 훅에서 지정한다고 적었다. 구현된 훅(KB-KOR-003)은 **빈 필드만 채우는 멱등 규칙**이라 코어가 타입 매칭으로 채운 필드를 재지정하지 않는다. 따라서 §6.1 의 형제 순서 규칙은 계속 유효하며, 2174 는 `Round Off for Opening` 타입으로 코어가 채운다(324판 실측). 훅이 채우는 것은 §11-1 의 12개다.
 - 2026-09-06 사용자 결정으로 §9-3 을 확정했다. 초판은 실현 환차손익도 단일 계정이 필요하다고 봤으나, v16 은 `exchange_gain_account`/`exchange_loss_account` 분리 필드를 우선 사용한다. 단일 계정이 실제로 필요한 것은 폴백·미실현 환산·자산처분 3곳이다.

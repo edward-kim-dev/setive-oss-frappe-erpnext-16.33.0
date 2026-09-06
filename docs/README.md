@@ -23,7 +23,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-DEV-001](./kb/KB-DEV-001_makefile_automation.md) | Makefile 개발 자동화 타겟 | 개발 도구 |
 | [KB-LOC-001](./kb/KB-LOC-001_regional_localization.md) | 시스템 지역 기본값 및 사용 언어 제한 | 한글화 |
 | [KB-LOC-002](./kb/KB-LOC-002_gettext_po_compilation.md) | Gettext 번역 탐색 순위와 PO/MO 컴파일 | 한글화 |
-| [KB-LOC-003](./kb/KB-LOC-003_fork_local_translation.md) | 포크 로컬 번역 문자열 추가 규약 (msgctxt) | 한글화 |
+| [KB-LOC-003](./kb/KB-LOC-003_fork_local_translation.md) | 번역 문자열 추가 규약 — 앱 ko.po 에 쓰고 포크 main.pot 만 갱신 (msgctxt) | 한글화 |
 | [KB-KOR-001](./kb/KB-KOR-001_ksic_wizard_industry.md) | 셋업 위저드 업종 분류를 KSIC 대분류로 교체 | 한국화 |
 | [KB-KOR-002](./kb/KB-KOR-002_korean_chart_of_accounts.md) | 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑 | 한국화 |
 | [KB-KOR-003](./kb/KB-KOR-003_company_hook_tax_nts.md) | Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정 | 한국화 |

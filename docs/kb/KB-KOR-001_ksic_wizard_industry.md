@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - frappe@v16
-verified_on: 2026-09-02
-verified_by: 소스 확인 + MO 컴파일 검증 + Node 하네스 런타임 검증
+verified_on: 2026-09-07
+verified_by: 소스 확인 + MO 컴파일 검증 + Node 하네스 런타임 검증 + v16.33.0 리베이스 후 번역 위치 재실측
 related: [ONT-CLS-001, KB-LOC-002, KB-LOC-003, KB-ARCH-001]
 ---
 
@@ -27,8 +27,8 @@ related: [ONT-CLS-001, KB-LOC-002, KB-LOC-003, KB-ARCH-001]
 | [`erpnext/public/js/setup_wizard.js`](../../erpnext/public/js/setup_wizard.js) | `:62`~`:103` | `erpnext.setup.ksic_sections` 신설 (21개 `{value, label}`) |
 | 〃 | `:133` | `persona_industry.options` 를 `[빈 옵션] + ksic_sections` 로 교체 |
 | 〃 | `:409`~`:434` | `erpnext.setup.industry_modules` 키를 `A`~`U` 로 재매핑 |
-| [`erpnext/locale/ko.po`](../../erpnext/locale/ko.po) | 정렬 위치 삽입 | `msgctxt "KSIC"` 항목 21건 추가, 사장된 옛 옵션 번역 5건 제거 |
-| [`erpnext/locale/main.pot`](../../erpnext/locale/main.pot) | 정렬 위치 삽입 | 동일 21건 추가 |
+| `setive_erpnext_kr/locale/ko.po` (앱) | KSIC 블록 | `msgctxt "KSIC"` 번역 21건. **포크 `ko.po` 가 아니다** (§9) |
+| [`erpnext/locale/main.pot`](../../erpnext/locale/main.pot) | 정렬 위치 삽입 | 동일 21건 msgid 추가 (`msgstr ""`) |
 | [`erpnext/setup/setup_wizard/setup_wizard.py`](../../erpnext/setup/setup_wizard/setup_wizard.py) | `:64` | 텔레메트리 `industry` 값이 KSIC 대분류 코드임을 주석 명시 |
 
 ## 3. 메커니즘
@@ -118,7 +118,7 @@ KSIC 대분류 21개는 모든 산업활동을 망라하므로 잔여 항목이 
 ### 6.1 번역 해석 확인
 
 ```bash
-make po      # ko.po → MO 컴파일 + 캐시 초기화
+make po      # 설치 앱 전체의 ko.po → MO 컴파일 + 캐시 초기화 (앱 ko.po 포함)
 docker exec setive-backend sh -lc 'cd /home/frappe/frappe-bench && \
   bench --site localhost execute frappe.translate.get_all_translations --kwargs "{\"lang\": \"ko\"}"' \
   | grep -o '"[^"]*:KSIC": "[^"]*"'
@@ -143,7 +143,7 @@ npx prettier@2.7.1 --check erpnext/public/js/setup_wizard.js
 npx eslint@8.44.0 --quiet erpnext/public/js/setup_wizard.js
 ```
 
-`ko.po` / `main.pot` 은 babel 정렬키(`msgid`, `msgctxt`) 순서를 유지해야 합니다. 삽입 후 정렬 위반 0 · 중복 키 0 확인.
+`main.pot` 은 babel 정렬키(`msgid`, `msgctxt`) 순서를 유지해야 합니다. 현재 중복 키 0, 정렬 위반 1건(SETIVE 삽입분, KB-LOC-003 §5.1). 앱 `ko.po` 는 CI 재생성 대상이 아니라 블록 구성만 지킵니다.
 
 ## 7. 남은 일 (로드맵)
 
@@ -161,4 +161,9 @@ npx eslint@8.44.0 --quiet erpnext/public/js/setup_wizard.js
 1. **위저드 값은 세무 근거가 아닙니다.** 사업자등록증의 업태/종목은 국세청이 부여하며, 사용자가 위저드에서 고른 대분류와 불일치할 수 있습니다. 1단계 값을 세무 판정에 승격시키지 마십시오.
 2. **DB에 저장되지 않습니다.** `persona_industry` 는 텔레메트리로만 나가고 `Company` 에 남지 않습니다. 값을 재사용해야 하면 3단계가 선행돼야 합니다.
 3. **텔레메트리 값 의미가 바뀌었습니다.** 기존 `"Manufacturing"` 등 영문 명칭에서 `"C"` 등 KSIC 코드로 변경. 과거 수집분과 직접 비교할 수 없습니다.
-4. **`ko.po` 잔여 항목.** 옛 옵션 전용이던 5건은 제거했으나, `Retail`·`Healthcare`·`Other`·`E-commerce` 는 다른 앱/문맥에서 참조될 가능성이 있어 남겨 뒀습니다. 전역 번역 사전이므로 무해하지만 사장된 항목입니다.
+4. **사장된 옛 옵션 번역.** 구 industry 옵션 전용 번역(`Wholesale / Distribution`, `Services / Consulting`, `Construction / Real Estate`, `Technology / Software`, `Food & Beverage`)과 `Retail`·`Healthcare`·`Other`·`E-commerce` 는 이 커밋으로 참조가 사라졌습니다. 현재는 앱 `ko.po` 의 위저드 블록에 남아 있습니다(KB-LOC-003 §6.1). 전역 번역 사전이므로 무해하지만 살아 있는 문자열로 오인하지 마십시오.
+
+## 9. 이전 서술 정정
+
+- **§2 의 "포크 `erpnext/locale/ko.po` 에 KSIC 번역 21건 추가, 옛 옵션 5건 제거" 는 더 이상 사실이 아닙니다** (2026-09-07). 2026-09-06 v16.33.0 리베이스에서 포크 `ko.po` 를 고친 커밋이 드롭되고 번역이 앱 `setive_erpnext_kr/locale/ko.po` 로 이관됐습니다. 포크 `ko.po` 는 현재 v16.33.0 원본과 바이트 동일합니다(`git diff v16.33.0..HEAD -- erpnext/locale/ko.po` 무출력). 규약과 경위는 KB-LOC-003 §1·§6.
+- `main.pot` 의 KSIC 21블록은 포크에 그대로 있습니다 — Crowdin source 이므로 포크가 소유합니다. 다만 그중 2블록이 babel 정렬을 어깁니다(KB-LOC-003 §5.1). §6.3 의 "정렬 위반 0" 서술을 정정했습니다.

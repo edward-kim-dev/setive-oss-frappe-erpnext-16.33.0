@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - frappe@v16
-verified_on: 2026-09-06
-verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판·324계정판 모두 Company 생성·측정·삭제 완료. 324판은 KB-KOR-003 E2E 에서 수행)
+verified_on: 2026-09-07
+verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판·324계정판 모두 Company 생성·측정·삭제 완료. 324판은 KB-KOR-003 E2E 에서 수행) + v16.33.0 리베이스 후 코어 심볼 재대조
 related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 ---
 
@@ -93,7 +93,7 @@ related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 
 ### 6.1 삽입 순서가 기본계정을 정한다
 
-`set_default_accounts()` ([`company.py:741`](../../erpnext/setup/doctype/company/company.py)) 는 `frappe.db.get_value("Account", {"account_type": T, "is_group": 0, "company": ...})` 로 찾는데 dict 필터 `get_value` 는 `ORDER BY creation DESC` 다. 즉 **같은 타입 원장이 여럿이면 트리에서 마지막에 삽입된 것**이 기본계정이다. 반대로 `default_income_account` 는 `get_all`(creation ASC) 의 **첫 번째**다(`:767-783`). 트리 삽입 순서 = JSON 형제 순서이므로 `build_kr_coa.py` 의 `DEFAULTS_LAST` / `DEFAULTS_FIRST` 가 해당 계정을 형제 중 마지막(첫)으로 옮기고, `validate_coa.py` (11) 이 이를 검사한다.
+`Company.set_default_accounts()` ([`company.py`](../../erpnext/setup/doctype/company/company.py)) 는 `frappe.db.get_value("Account", {"account_type": T, "is_group": 0, "company": ...})` 로 찾는데 dict 필터 `get_value` 는 `ORDER BY creation DESC` 다. 즉 **같은 타입 원장이 여럿이면 트리에서 마지막에 삽입된 것**이 기본계정이다. 반대로 `default_income_account` 는 `get_all`(creation ASC) 의 **첫 번째**다(같은 함수 안). 트리 삽입 순서 = JSON 형제 순서이므로 `build_kr_coa.py` 의 `DEFAULTS_LAST` / `DEFAULTS_FIRST` 가 해당 계정을 형제 중 마지막(첫)으로 옮기고, `validate_coa.py` (11) 이 이를 검사한다.
 
 | 타입 | 마지막(첫) 삽입 원장 | 채워지는 필드 |
 |---|---|---|
@@ -113,7 +113,9 @@ related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 
 Company 기본 필드 39개 중 21개가 채워졌다: 위 9개 + `round_off_account` 5490, `stock_adjustment_account` 5140, `stock_received_but_not_billed` 2161, `stock_delivered_but_not_billed` 1160, `capital_work_in_progress_account` 1246, `asset_received_but_not_billed` 2163, `write_off_account`·`bank_charges_account`(이름 매칭, 확정본에서는 계정 삭제 → 비어 있음), 코스트센터 3(`기본 - 약어`), `default_warehouse`(`백화점 - 약어`, §9-7).
 
-**비는 필드**: `exchange_gain_loss_account`, `exchange_gain_account`, `exchange_loss_account`, `unrealized_exchange_gain_loss_account`, `disposal_account`, `round_off_for_opening`, `default_deferred_revenue/expense_account`, `default_purchase_price_variance_account`, `default_manufacturing_variance_account`, `default_discount_account`, `default_provisional_account`, `default_advance_received/paid_account`, `default_operating_cost_account`, 창고 4종. 이 중 코어가 **번역된 이름**으로만 찾는 6개(`_("Write Off")`, `_("Bank Charges")`, `_("Exchange Gain/Loss")`, `_("Exchange Gain")`, `_("Exchange Loss")`, `_("Gain/Loss on Asset Disposal")`, `company.py:790-826`)는 한국 계정명으로는 절대 잡히지 않는다. 앱 훅이 번호로 채운다(§11-1).
+**비는 필드**: `exchange_gain_loss_account`, `exchange_gain_account`, `exchange_loss_account`, `unrealized_exchange_gain_loss_account`, `disposal_account`, `round_off_for_opening`, `default_deferred_revenue/expense_account`, `default_purchase_price_variance_account`, `default_manufacturing_variance_account`, `default_discount_account`, `default_provisional_account`, `default_advance_received/paid_account`, `default_operating_cost_account`, 창고 4종. 이 중 코어가 **번역된 이름**으로만 찾는 것은 한국 계정명으로 절대 잡히지 않는다. 앱 훅이 번호로 채운다(§11-1).
+
+**16.33 에서는 3개다** — `_("Write Off")`, `_("Exchange Gain/Loss")`, `_("Gain/Loss on Asset Disposal")` (`Company.set_default_accounts` 말미). 초판이 적은 6개는 17-dev 기준이며 `_("Bank Charges")`·`_("Exchange Gain")`·`_("Exchange Loss")` 는 **16.33 Company 에 필드 자체가 없다**(§12). 위 실측 문단의 `bank_charges_account`·`default_warehouse` 도 17-dev 실측값이다.
 
 ## 7. 표준재무제표 코드 매핑 파일
 
@@ -188,12 +190,12 @@ accounts        계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role
 ## 9. 알려진 한계
 
 1. **자본 카테고리 2종.** `Account Category` 에 자본용은 `Share Capital`·`Reserves and Surplus` 뿐이라 IFRS 재무상태표 템플릿에서 자본잉여금·자본조정·기타포괄손익누계액·이익잉여금이 한 행으로 합산된다. 트리는 5분류를 유지하므로 한국식 재무상태표 리포트는 트리 기준으로 만든다.
-2. **이름 매칭 6항목**(§6.2)은 JSON 만으로 채울 수 없다. 앱 `ko.po` 에서 msgid 번역을 덮는 방식은 Sales Invoice 의 'Write Off' 섹션 등 UI 문자열까지 바뀌므로 쓰지 않는다.
-3. **단일 손익 계정 — 결정됨 (2026-09-06, 선택지 (i)).** 영업외비용에 `5422 외환차손익`·`5423 외화환산손익`·`5452 유형자산처분손익` 을 추가했다. 각각 코어의 `exchange_gain_loss_account`(폴백)·`unrealized_exchange_gain_loss_account`([`exchange_rate_revaluation.py:364`](../../erpnext/accounts/doctype/exchange_rate_revaluation/exchange_rate_revaluation.py) — 미설정 시 throw)·`disposal_account`([`sales_invoice_item.py:122`](../../erpnext/accounts/doctype/sales_invoice_item/sales_invoice_item.py)) 전용이며, 결산 시 차익은 4250/4251/4260, 차손은 5420/5421/5450 으로 대체해 잔액 0 을 만든다(매핑표 reconciliation '결산대체 완료'). **실현 환차손익은 v16 이 이미 분리 필드를 쓴다** — [`exchange_gain_loss.py:14-18`](../../erpnext/accounts/services/exchange_gain_loss.py) 가 `exchange_gain_account`/`exchange_loss_account` 를 우선하고 단일 계정은 폴백이므로, 훅이 4250/5420 을 분리 필드에 지정하면 5422 는 평소 잔액이 생기지 않는다.
+2. **이름 매칭 항목**(16.33 기준 3개, §6.2)은 JSON 만으로 채울 수 없다. 앱 `ko.po` 에서 msgid 번역을 덮는 방식은 Sales Invoice 의 'Write Off' 섹션 등 UI 문자열까지 바뀌므로 쓰지 않는다.
+3. **단일 손익 계정 — 결정됨 (2026-09-06, 선택지 (i)).** 영업외비용에 `5422 외환차손익`·`5423 외화환산손익`·`5452 유형자산처분손익` 을 추가했다. 각각 코어의 `exchange_gain_loss_account`(16.33 의 실현 환차손익 단일 계정)·`unrealized_exchange_gain_loss_account`([`exchange_rate_revaluation.py:364`](../../erpnext/accounts/doctype/exchange_rate_revaluation/exchange_rate_revaluation.py) — 미설정 시 throw)·`disposal_account`([`sales_invoice_item.py:122`](../../erpnext/accounts/doctype/sales_invoice_item/sales_invoice_item.py)) 전용이며, 결산 시 차익은 4250/4251/4260, 차손은 5420/5421/5450 으로 대체해 잔액 0 을 만든다(매핑표 reconciliation '결산대체 완료'). ⚠️ **초판의 "실현 환차손익은 v16 이 분리 필드를 쓴다"는 서술은 16.33 에서 거짓이다**(§12). 16.33 에는 `exchange_gain_account`/`exchange_loss_account` 필드도, 그것을 쓰는 `erpnext/accounts/services/exchange_gain_loss.py` 도 없다. 실현 환차손익은 **`exchange_gain_loss_account`(5422) 하나로만 기표되므로 5422 에 잔액이 쌓인다.** 4250 외환차익 / 5420 외환차손 분리 표시는 결산 대체분개로만 만든다 — 미실현(5423)·자산처분(5452)과 같은 취급이다.
 4. **세금 템플릿 0건.** `country_wise_tax.json` 의 한국 키는 `"South Korea"` 인데 `Company.country` 는 `"Korea, Republic of"` 라 `taxes_setup.py:20-22` 가 즉시 return 한다. 부가세 10% 템플릿은 앱 훅이 만든다(§11-3). 포크의 `country_wise_tax.json` 수정은 3단계 에스컬레이션 대상.
 5. **IFRS 현금흐름표 무형자산 행.** `standard_cash_flow_statement_(ifrs).json:426` 은 `account_category = Intangible Assets` 만 보고 유형자산 행(`:375`)과 달리 Accumulated Depreciation 제외 조건이 없어 상각 대변이 투자활동에 순액으로 섞인다. 상위 템플릿 한계 — 한국 현금흐름표 템플릿 과제.
 6. **서식 개정 대응.** `validate_coa.py` 가 `meta.*_revised` 와 `nts_codes.json` 의 `revised` 를 대조한다. 서식이 개정되면 PDF 재추출 → `nts_codes.json` 갱신 → 매핑 재검토 순서다. `is 220` 처럼 배열 끝에 코드가 붙으므로 items 는 읽기 순서이지 코드순이 아니다.
-7. **`Stores` → `백화점` 오역.** `erpnext/locale/ko.po:54110` 때문에 위저드 기본창고가 `백화점 - 약어` 로 생긴다(`Sales` → `매상` 도 같은 유형). 포크 `ko.po` 가 아니라 앱 `ko.po` 에서 재정의한다.
+7. **`Stores` → `백화점` 오역.** 포크 `erpnext/locale/ko.po` 의 `msgid "Stores"` 항목(v16.33.0 기준 `:52640`) 때문에 위저드 기본창고가 `백화점 - 약어` 로 생긴다(`Sales` → `매상` 도 같은 유형). 포크 `ko.po` 가 아니라 앱 `ko.po` 에서 재정의한다.
 8. **창고 계정 미매핑.** 위저드가 만드는 창고 5개는 `account` 가 비어 있어 창고 매핑 전에는 상품·제품 입출고도 전부 1155 원재료로 전기된다.
 9. **위저드 밖에서 Company 를 만들면** `Warehouse Type "Transit"` 이 없어 `LinkValidationError` 가 난다(`install_fixtures.py:316` 이 위저드에서만 실행). 실측 재현·확인.
 10. **통화.** 위저드 경로는 `account_currency` 를 무시하고 Company 기본통화(KRW)로 일괄 지정한다. 외화계좌는 테넌트가 통화를 지정해 원장을 추가한다.
@@ -248,7 +250,7 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 | 5 | 선급금 1144 `Payable`·선수금 2141 `Receivable` 타입 부여 + `default_advance_paid/received_account` 지정 | JSON + 훅 | **보류 — 사용자 결정(2026-09-06)** 으로 타입을 부여하지 않았고 훅은 `default_advance_*` 를 비워 둔다(KB-KOR-003 §4.2). 재개하려면 훅(1) 이 이미 있으므로 JSON 만 바꾸면 된다 |
 | 6 | 표준재무제표 리포트 — `computed`/`reconciliation` 실행기, 전표 단위 상대계정 산출 | 앱 리포트 | 테스트 원장으로 항등식 검증 |
 | 7 | 앱 `ko.po` 에 `Stores`·`Sales` 재정의 | `setive_erpnext_kr/locale/ko.po` | `Stores`→`창고` 완료(`ko.po:137`, KB-KOR-003 실측 `창고 - SHV`). `Sales` 는 미처리. KB-LOC-003 규약 |
-| 8 | 외환차손익·유형자산처분손익 단일 계정 결정 | 사용자 | **결정됨(§9-3, 2026-09-06)**. 훅이 5422/5423/5452 와 분리 필드 4250/5420 을 지정한다(KB-KOR-003 §4.1) |
+| 8 | 외환차손익·유형자산처분손익 단일 계정 결정 | 사용자 | **결정됨(§9-3, 2026-09-06)**. 훅이 5422/5423/5452 를 지정한다(KB-KOR-003 §4.1). 분리 필드 4250/5420 은 **16.33 에 존재하지 않으므로** 훅에서 제거 대상이다(§12, KB-KOR-003 §11-14) |
 | 9 | K-IFRS 적용 테넌트 대응 검토 | — | 결정 1 에 따라 별도 벌은 만들지 않음. 필요 시 카테고리 확장으로 대응 |
 | 10 | 표준재무제표 코드를 Account 에 기록 — Custom Field(bs/is/mfg/role/note) + Company 매핑 개정 표식 | `korea/common/nts_codes.py` | **완료 → KB-KOR-003 §7**. 원장 272/272 채움, `force` 재적용·`report_unmapped` 점검 제공. 리포트 실행기(6)는 별개 |
 
@@ -261,4 +263,14 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 - 리뷰 전 매핑의 "차감계정은 서식의 괄호 행 코드에 대변잔액 그대로 배정" 은 `amount_convention` + `sign:-1` 로 형식화했다. 의미는 같다.
 - 리뷰안 중 채택하지 않은 것: 결함 7 의 교차 매핑(Income 계정 → 판관비 행 음수), 결함 10 의 5140 → mfg 39, 결함 11 의 1160 이동, 결함 3 의 리프 번호안(1160 을 유지하고 1161~1164 사용). 근거는 §8.
 - §11-1 초판은 "훅이 있으면 JSON 형제 순서 의존이 사라진다" 고 적었고 §8 결함 21 은 `round_off_for_opening`=2174 를 훅에서 지정한다고 적었다. 구현된 훅(KB-KOR-003)은 **빈 필드만 채우는 멱등 규칙**이라 코어가 타입 매칭으로 채운 필드를 재지정하지 않는다. 따라서 §6.1 의 형제 순서 규칙은 계속 유효하며, 2174 는 `Round Off for Opening` 타입으로 코어가 채운다(324판 실측). 훅이 채우는 것은 §11-1 의 12개다.
-- 2026-09-06 사용자 결정으로 §9-3 을 확정했다. 초판은 실현 환차손익도 단일 계정이 필요하다고 봤으나, v16 은 `exchange_gain_account`/`exchange_loss_account` 분리 필드를 우선 사용한다. 단일 계정이 실제로 필요한 것은 폴백·미실현 환산·자산처분 3곳이다.
+- 2026-09-06 사용자 결정으로 §9-3 을 확정했다. 초판은 실현 환차손익도 단일 계정이 필요하다고 봤다. **아래 2026-09-07 정정을 함께 읽을 것 — 결과적으로 초판이 맞았다.**
+
+### 2026-09-07 — v16.33.0 리베이스에 따른 정정
+
+이 문서의 코어 인용은 포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있을 때 실측한 것입니다. 2026-09-06 리베이스로 코어가 `v16.33.0` 이 되면서 아래가 사실과 달라졌습니다.
+
+- **`Company.bank_charges_account` · `exchange_gain_account` · `exchange_loss_account` 는 16.33 에 필드가 없습니다** (17-dev 전용). §6.2 의 "이름 매칭 6개" 는 16.33 에서 3개이고, 같은 문단의 `bank_charges_account` 채워짐 기록도 17-dev 실측값입니다. 근거: `grep -c '"bank_charges_account"' erpnext/setup/doctype/company/company.json` → 0, `grep -rn "exchange_gain_account" --include='*.py' erpnext` → 0건.
+- **§9-3 의 "v16 은 실현 환차손익을 분리 필드로 기표한다"는 서술을 철회합니다.** 근거로 인용한 `erpnext/accounts/services/exchange_gain_loss.py` 가 16.33 에 없습니다(워킹트리에 `__pycache__` 만 남은 고아 디렉토리라 `ls` 로는 있는 것처럼 보임). 16.33 은 `exchange_gain_loss_account` 단일 계정만 씁니다(코어 13개 파일 참조). **회계 영향: 5422 외환차손익에 실현분 잔액이 실제로 쌓이므로 결산 대체가 필수입니다.** 초판의 "실현 환차손익도 단일 계정이 필요하다"는 판단이 16.33 에서는 옳았습니다.
+- **`Company.default_warehouse` 도 16.33 에 없습니다.** §6.2 실측 목록과 §12 첫 항목의 "기본창고" 는 17-dev 기준입니다. 16.33 `create_default_warehouses` 는 창고만 만들고 Company 필드를 채우지 않습니다(KB-KOR-003 §5·§12).
+- **`company.py` 라인 번호가 어긋났습니다** — `set_default_accounts` 741 → 623. 이 문서의 코어 인용을 함수명 기준으로 바꿨습니다. 남은 라인 번호(`exchange_rate_revaluation.py`, `sales_invoice_item.py`, `taxes_setup.py`, `install_fixtures.py`, `chart_of_accounts.py`)는 17-dev 시점 값이며 몇 줄씩 어긋날 수 있습니다. 확인은 `grep -n` 으로 합니다.
+- **§10 의 검증 명령은 리베이스 후에도 그대로 유효합니다.** 차트 파일 md5 `4a5b7e9873dc3eee93bffb046137836b`, 계정 324(그룹 52·원장 272) 재확인했습니다.

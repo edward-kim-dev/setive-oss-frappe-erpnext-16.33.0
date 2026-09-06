@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-06
-verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제)
+verified_on: 2026-09-07
+verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07)
 related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001]
 ---
 
@@ -76,51 +76,59 @@ apply_all(company)
 
 ## 4. 기본계정 (`company_defaults.py`)
 
-### 4.1 훅이 채우는 12개
+### 4.1 훅이 채우는 12개 (16.33 에서 유효한 것은 9개)
 
-계정번호·이름은 [`kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) 기준. 실측 12/12 일치.
+계정번호·이름은 [`kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) 기준.
 
-| Company 필드 | 계정 | 근거 (코어 사용처) |
-|---|---|---|
-| `write_off_account` | 5480 잡손실 | Sales Invoice / Payment Entry 의 소액 write-off(단수·잔액 정리). 대손은 JE 로 5325 대손상각비에 직접 기표한다 |
-| `bank_charges_account` | 5322 지급수수료 | Payment Entry / Bank Transaction 의 은행수수료 행 |
-| `exchange_gain_loss_account` | 5422 외환차손익 | 단일 계정 **폴백**. [`exchange_gain_loss.py:14-18`](../../erpnext/accounts/services/exchange_gain_loss.py) 이 gain/loss 분리 필드를 우선 쓰므로 평소 잔액이 생기지 않는다 |
-| `exchange_gain_account` | 4250 외환차익 | 실현 환차익 (위 함수가 우선 사용) |
-| `exchange_loss_account` | 5420 외환차손 | 실현 환차손 |
-| `unrealized_exchange_gain_loss_account` | 5423 외화환산손익 | Exchange Rate Revaluation 이 차익·차손을 모두 기표. 결산 시 4251/5421 대체(KB-KOR-002 §9-3) |
-| `disposal_account` | 5452 유형자산처분손익 | Asset 매각 Sales Invoice 행의 income_account |
-| `default_deferred_revenue_account` | 2142 선수수익 | Item Group 기본값으로 내려간다 ([`item_group.py:125`](../../erpnext/setup/doctype/item_group/item_group.py)) |
-| `default_deferred_expense_account` | 1174 선급비용 | `item_group.py:124` |
-| `default_discount_account` | 4191 제품매출할인 | 4190 은 그룹이라 리프 필요. 제조업 타깃이므로 제품(4192 상품 아님). Payment Entry 조기결제 할인 손실 행과 품목 `discount_account` 기본값. **매입 측 조기결제 할인(Pay)도 같은 필드**를 쓴다 |
-| `default_operating_cost_account` | 5251 잡비(제) | BOM 작업(Operation) 원가·비재고 품목 원가가 제조 Stock Entry `additional_costs` 의 `expense_account`(대변, 제조경비 흡수)로 들어간다 ([`operations_cost.py:17-31`](../../erpnext/manufacturing/doctype/bom/services/operations_cost.py)). 영구재고 회사에서 이 필드가 비면 작업이 있는 Work Order 의 제조 전표가 실패한다. 워크스테이션 단가는 노무·전력·소모품 혼합이라 단일 성격 계정이 없어 제조경비 리프 중 기타(잡비)를 택했다 |
-| `default_provisional_account` | 2162 용역수령미청구 | 코어 CoA 임포터가 `Service Received But Not Billed` 타입 계정을 이 필드에 넣는 선례 ([`chart_of_accounts_importer.py:515-518`](../../erpnext/accounts/doctype/chart_of_accounts_importer/chart_of_accounts_importer.py)). `enable_provisional_accounting_for_non_stock_items` 를 켤 때 비어 있으면 `Company.validate` 가 throw 하므로(`company.py:688-698`) 미리 채운다 |
+> ⚠️ **12개 중 3개는 ERPNext 16.33 의 Company DocType 에 필드가 없다 (미해결, 2026-09-07).** 아래 표에서 ✗ 표시된 `bank_charges_account` · `exchange_gain_account` · `exchange_loss_account` 는 17-dev 전용 필드였다. 실측: `grep -c '"bank_charges_account"' erpnext/setup/doctype/company/company.json` → 0.
+> `company_defaults.apply()` 는 첫 문장에서 `frappe.db.get_value("Company", company, [*DEFAULTS.keys(), ...])` 로 12개를 한 번에 읽으므로, **컬럼이 없는 신규 16.33 사이트에서는 `OperationalError(1054) Unknown column` 이 나고 `Company.on_update` 훅 전체가 실패해 회사 생성이 롤백된다.**
+> 현재 개발 사이트에서 통과하는 것은 리베이스 후 `bench migrate` 를 하지 않아 `tabCompany` 컬럼과 `tabDocField` 가 17-dev 상태로 남아 있기 때문이며 정합성 증거가 아니다.
+> → 앱 `company_defaults.py` 의 `DEFAULTS` 에서 세 항목을 빼고, `apply()` 를 `frappe.get_meta("Company").has_field(f)` 로 걸러 버전 차이가 예외가 아니라 `skipped` 로 기록되게 한다. 사람 승인 사항이다.
+
+아래 "16.33" 열: ✅ = Company 필드 실재, ✗ = 필드 없음(위 경고).
+
+| Company 필드 | 16.33 | 계정 | 근거 (코어 사용처) |
+|---|---|---|---|
+| `write_off_account` | ✅ | 5480 잡손실 | Sales Invoice / Payment Entry 의 소액 write-off(단수·잔액 정리). 대손은 JE 로 5325 대손상각비에 직접 기표한다 |
+| `bank_charges_account` | ✗ | 5322 지급수수료 | **16.33 Company 에 필드 없음.** 같은 이름이 Invoice Discounting 자체 필드로 존재할 뿐이고 `Company.bank_charges_account` 참조는 코어에 0건이다 |
+| `exchange_gain_loss_account` | ✅ | 5422 외환차손익 | **16.33 이 실현 환차손익에 쓰는 유일한 계정.** 코어 13개 파일이 참조한다. 폴백이 아니다 |
+| `exchange_gain_account` | ✗ | 4250 외환차익 | **16.33 Company 에 필드 없음** (코어 참조 0건). 4250/5420 분리 표시는 자동으로 되지 않으며 결산 대체분개가 필요하다 |
+| `exchange_loss_account` | ✗ | 5420 외환차손 | 위와 같음 |
+| `unrealized_exchange_gain_loss_account` | ✅ | 5423 외화환산손익 | Exchange Rate Revaluation 이 차익·차손을 모두 기표. 결산 시 4251/5421 대체(KB-KOR-002 §9-3) |
+| `disposal_account` | ✅ | 5452 유형자산처분손익 | Asset 매각 Sales Invoice 행의 income_account |
+| `default_deferred_revenue_account` | ✅ | 2142 선수수익 | [`stock/get_item_details.py`](../../erpnext/stock/get_item_details.py) `get_default_deferred_account` 가 Item Default → 문서 → `Company.default_<fieldname>` 순으로 읽는다 |
+| `default_deferred_expense_account` | ✅ | 1174 선급비용 | 위와 같음 |
+| `default_discount_account` | ✅ | 4191 제품매출할인 | 4190 은 그룹이라 리프 필요. 제조업 타깃이므로 제품(4192 상품 아님). Payment Entry 조기결제 할인 손실 행과 품목 `discount_account` 기본값. **매입 측 조기결제 할인(Pay)도 같은 필드**를 쓴다 |
+| `default_operating_cost_account` | ✅ | 5251 잡비(제) | BOM 작업(Operation) 원가가 이 계정으로 흡수된다 ([`bom.py:1615`](../../erpnext/manufacturing/doctype/bom/bom.py)). 영구재고 회사에서 이 필드가 비면 작업이 있는 Work Order 의 제조 전표가 실패한다. 워크스테이션 단가는 노무·전력·소모품 혼합이라 단일 성격 계정이 없어 제조경비 리프 중 기타(잡비)를 택했다 |
+| `default_provisional_account` | ✅ | 2162 용역수령미청구 | 코어 CoA 임포터가 `Service Received But Not Billed` 타입 계정을 이 필드에 넣는 선례 ([`chart_of_accounts_importer.py:513`](../../erpnext/accounts/doctype/chart_of_accounts_importer/chart_of_accounts_importer.py)). 소비처는 [`purchase_invoice.py:1343`](../../erpnext/accounts/doctype/purchase_invoice/purchase_invoice.py). `enable_provisional_accounting_for_non_stock_items` 를 켤 때 비어 있으면 `Company.validate_provisional_account_for_non_stock_items` 가 throw 하므로 미리 채운다 |
 
 ### 4.2 의도적으로 비워 두는 것 (`INTENTIONALLY_EMPTY`)
 
 | 필드 | 이유 |
 |---|---|
-| `default_purchase_price_variance_account` | 표준원가(Item Standard Cost) 전용. [`item_standard_cost.py:334-353`](../../erpnext/stock/doctype/item_standard_cost/item_standard_cost.py) 에서만 읽히며 비어 있으면 명확한 메시지로 throw. 한국 차트에 원가차이 계정이 없다. 표준원가 테넌트가 나올 때 `tree_draft.json` 에 추가한다 |
-| `default_manufacturing_variance_account` | 위와 같음 (`item_standard_cost.py:357-376`) |
+| `default_purchase_price_variance_account` | **16.33 에는 Company 필드도 `Item Standard Cost` DocType 도 없다 — 17-dev 전용 기능이다.** 쓰기 없음. 표준원가 도입 절차는 17 로 올라간 뒤로 유보한다(한국 차트에 원가차이 계정도 없다) |
+| `default_manufacturing_variance_account` | 위와 같음 |
 | `default_advance_received_account` / `default_advance_paid_account` | **사용자 결정** — 선수금 2141 / 선급금 1144 에 Receivable/Payable 타입을 부여하지 않았다(KB-KOR-002 §8 결함 24, §11-5). `book_advance_payments_in_separate_party_account` 를 켜지 않는다 |
 | `default_scrap_warehouse` | 코어가 스크랩 창고를 만들지 않는다. `work_order.py:1122-1131` 이 None 을 허용한다 |
 
-### 4.3 훅이 건드리지 않는 것 — 코어가 채우는 15 + 4
+### 4.3 훅이 건드리지 않는 것 — 코어가 채우는 것
 
-`account_type` 매칭으로 코어 `set_default_accounts` (`company.py:741`) 가 채우는 것: 수취 1131 · 지급 2111 · 현금 1111 · 은행 1115 · 단수차이 5490 · 매출원가 5120 · 매출 4111 · 재고 1155 · 재고조정 5140 · 입고미청구 2161 · 출고미청구 1160 · 감가상각누계액 1243 · 감가상각비 5311 · 건설중 1246 · 자산취득미청구 2163 · 기초잔액단수차이 2174, 코스트센터 3(`기본 - 약어`), `default_warehouse`. 실측 전부 기대값.
+`account_type` 매칭으로 코어 `Company.set_default_accounts`([`company.py`](../../erpnext/setup/doctype/company/company.py)) 가 채우는 것: 수취 1131 · 지급 2111 · 현금 1111 · 은행 1115 · 단수차이 5490 · 매출원가 5120 · 매출 4111 · 재고 1155 · 재고조정 5140 · 입고미청구 2161 · 출고미청구 1160 · 감가상각누계액 1243 · 감가상각비 5311 · 건설중 1246 · 자산취득미청구 2163 · 기초잔액단수차이 2174, 그리고 코스트센터 3(`기본 - 약어`). 17-dev 에서 실측한 값이며 `default_warehouse` 는 16.33 Company 에 필드가 없어 목록에서 뺐다(§12).
 
 훅은 이 필드들에 개입하지 않는다. 따라서 **같은 타입 원장이 여럿일 때 JSON 형제 순서가 기본계정을 정한다는 규칙(KB-KOR-002 §6.1)은 그대로 유효하다.** KB-KOR-002 §11-1 초판은 "훅이 있으면 형제 순서 의존이 사라진다"고 적었으나 그 범위로는 구현하지 않았다 — 빈 필드만 채우는 멱등 규칙과 양립하지 않기 때문이다.
 
 ## 5. 창고 (`warehouses.py`)
 
-코어 `create_default_warehouses` (`company.py:495-534`) 는 `All Warehouses` 그룹 아래 창고 4개를 만들고 `default_warehouse` 만 채운다. 창고 `account` 와 Company 창고 필드 3개는 비어 있다.
+코어 `Company.create_default_warehouses`([`company.py`](../../erpnext/setup/doctype/company/company.py)) 는 `All Warehouses` 그룹 아래 창고 4개를 만들 뿐 **어떤 Company 필드도 채우지 않는다.** 창고 `account` 와 Company 창고 필드 3개는 비어 있다.
 
 | role | 코어 영문명 → 표시명 | `account` | Company 필드 |
 |---|---|---|---|
-| stores | Stores → `창고`(앱 ko.po) / `백화점`(포크 ko.po, 앱 교정 전) | 1155 원재료 | — (`default_warehouse` 는 코어가 채움) |
+| stores | Stores → `창고`(앱 ko.po) / `백화점`(포크 ko.po, 앱 교정 전) | 1155 원재료 | — (16.33 Company 에 `default_warehouse` 필드가 없다. §12) |
 | wip | Work In Progress → `작업 진행 중` | 1154 재공품 | `default_wip_warehouse` |
 | fg | Finished Goods → `완제품` | 1152 제품 | `default_fg_warehouse` |
 | transit | Goods In Transit → `운송 중인 상품` (`warehouse_type=Transit`) | 1158 미착품 | `default_in_transit_warehouse` |
 
+- **Stores 는 회사 단위 기본 창고로 지정되지 않는다.** 16.33 Company 에는 `default_warehouse` 필드가 없다(17-dev 전용). 회사와 무관한 전역 기본값은 `Stock Settings.default_warehouse` 뿐이고, 품목 단위로는 Item Default 경로가 있다. 기본 입고 창고가 필요하면 둘 중 무엇을 쓸지 결정해야 한다(§11-13). `ROLES['stores']['company_field']` 는 `None` 이 맞다.
 - **왜 Stores 에도 명시하는가.** 창고 계정 우선순위([`stock/__init__.py:56-99`](../../erpnext/stock/__init__.py))는 `Warehouse.account` → 조상 창고 `account` → `Company.default_inventory_account` → 유일 Stock 리프. `Warehouse.account` 가 회사 기본값을 이기므로 기본값이 바뀌어도 Stores 는 1155 를 유지한다. 그룹 `All Warehouses` 는 비워 둔다.
 - **식별은 `warehouse_name` 으로.** `Warehouse.name` 은 `"<warehouse_name> - <abbr>"` ([`warehouse.py:55-62`](../../erpnext/stock/doctype/warehouse/warehouse.py)) 라 회사마다 다르다. 후보 집합 = 영문 + 포크 번역 + 앱 번역 + 런타임 `_()` (현재 언어·ko). 생성 순서(`creation`)에는 의존하지 않는다 — 사용자가 창고를 추가하면 깨진다.
 - **Transit 은 타입 우선.** 코어가 `warehouse_type="Transit"` 을 붙이는 유일한 창고이고 `default_in_transit_warehouse` 의 `link_filters` ([`company.json:771`](../../erpnext/setup/doctype/company/company.json)) 도 Transit 을 요구한다. 매칭 순서: 이름이 맞는 Transit → 유일한 Transit → 이름만. 타입이 맞지 않는 창고는 Company 필드에 넣지 않고 `skipped`.
@@ -180,7 +188,7 @@ apply_all(company)
 
 과제 사양은 "면세 → 세액행 없음"이었으나 각 템플릿에 계정 행 1개(rate 0)를 두었다.
 
-`Accounts Settings.add_taxes_from_item_tax_template` 기본값이 1 이다(이 사이트도 1). 문서의 `taxes` 가 비어 있으면 [`accounts/services/taxes.py:47-63`](../../erpnext/accounts/services/taxes.py) 이 품목 `item_tax_rate` 의 **모든** 계정을 행으로 추가한다. 품목 템플릿이 양방향(2151+1172)이라 빈 `taxes` 의 매출 문서에 1172 10% 행이 생겨 총액이 틀어진다. 템플릿에 행이 하나라도 있으면 이 경로가 실행되지 않는다. 세액 0 행은 GL 을 만들지 않는다(gl_composer 가 `flt(base_amount)` 로 거른다). Australia `AU Sales - GST Free` 가 같은 구성이다.
+`Accounts Settings.add_taxes_from_item_tax_template` 기본값이 1 이다(이 사이트도 1). 문서의 `taxes` 가 비어 있으면 [`controllers/accounts_controller.py`](../../erpnext/controllers/accounts_controller.py) 의 `AccountsController.append_taxes_from_item_tax_template` 이 품목 `item_tax_rate` 의 **모든** 계정을 행으로 추가한다. 품목 템플릿이 양방향(2151+1172)이라 빈 `taxes` 의 매출 문서에 1172 10% 행이 생겨 총액이 틀어진다. 템플릿에 행이 하나라도 있으면 이 경로가 실행되지 않는다. 세액 0 행은 GL 을 만들지 않는다([`sales_invoice.py:1710`](../../erpnext/accounts/doctype/sales_invoice/sales_invoice.py) 의 `if flt(tax.base_tax_amount_after_discount_amount):` 가 거른다). Australia `AU Sales - GST Free` 가 같은 구성이다.
 
 실측: 영세율매출(8-d) 은 taxes 행 1개(rate 0, `net_amount` 1,000,000 과세표준 포함), GL 은 1131/4111 만. 면세매출(8-e) 도 GL 은 같으나 `부가세 해당없음 (면세) 0` 행이 남는다 → 검증 담당이 **사양 문자 기준 low 결함**으로 기록. 빈 템플릿을 원하면 `kr_tax_defaults.json` 에서 해당 `taxes` 를 `[]` 로 바꾸면 된다(코드 변경 불필요). 승인 대기(§11).
 
@@ -282,11 +290,17 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_codes.apply 
 
 저장소 루트(`setive-oss-erpnext-16.33`)에서 실행한다. `<회사명>` 은 한국 차트로 만든 회사.
 
+**전제:** 포크가 이미지 태그와 같은 `v16.33.0` 위에 있고(KB-OPS-001 §1.7), 리베이스 후 `bench migrate` 가 끝난 상태여야 한다. 스키마가 17-dev 에 머물러 있으면 아래 값들이 17-dev 정합성을 검증하게 된다(§10-1).
+
 ```bash
 COMPOSE=docker/development/docker-compose.yml
 SITE=localhost
 EXEC="docker compose -f $COMPOSE exec -T backend"
 COMPANY='<회사명>'
+
+# 0. 버전 전제 — 기대: 16.33.0 16.31.0
+$EXEC /home/frappe/frappe-bench/env/bin/python -c \
+  "import frappe, erpnext; print(erpnext.__version__, frappe.__version__)"
 
 # 훅 등록 — 기대: {'Company': {'on_update': ['setive_erpnext_kr.korea.common.company.on_update']}}
 $EXEC bench --site $SITE execute frappe.get_hooks \
@@ -296,13 +310,14 @@ $EXEC bench --site $SITE execute frappe.get_hooks \
 $EXEC /home/frappe/frappe-bench/env/bin/python -c \
   "from setive_erpnext_kr.korea.common import company, company_defaults, warehouses, taxes, nts_codes; print('OK')"
 
-# 계정 수 — 기대 324 (포크 차트 md5 4a5b7e9873dc3eee93bffb046137836b, HEAD 1b9e100)
+# 계정 수 — 기대 324 (포크 차트 md5 4a5b7e9873dc3eee93bffb046137836b, 차트 커밋 eba9d6a8)
 $EXEC bench --site $SITE execute frappe.client.get_count \
   --kwargs "{'doctype':'Account','filters':{'company':'$COMPANY'}}"
 
-# 기본계정 — 기대: 5480 잡손실 / 4250 외환차익 / 5251 잡비(제) / 완제품 - <약어> / bs=2021-10-28;is=2024-03-22;mfg=2023-03-20
+# 기본계정 — 기대: 5480 잡손실 / 5422 외환차손익 / 5251 잡비(제) / 완제품 - <약어> / bs=2021-10-28;is=2024-03-22;mfg=2023-03-20
+#   ※ exchange_gain_account 는 16.33 Company 에 없는 필드다. 조회하면 실패한다 (§4.1)
 $EXEC bench --site $SITE execute frappe.client.get_value \
-  --kwargs "{'doctype':'Company','filters':{'name':'$COMPANY'},'fieldname':['write_off_account','exchange_gain_account','default_operating_cost_account','default_fg_warehouse','setive_nts_map_revision']}"
+  --kwargs "{'doctype':'Company','filters':{'name':'$COMPANY'},'fieldname':['write_off_account','exchange_gain_loss_account','default_operating_cost_account','default_fg_warehouse','setive_nts_map_revision']}"
 
 # 창고 계정 — 기대: 창고 1155 · 작업 진행 중 1154 · 완제품 1152 · 운송 중인 상품(Transit) 1158 · 모든 창고 없음
 $EXEC bench --site $SITE execute frappe.client.get_list \
@@ -333,6 +348,10 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 
 ### 9.2 2026-09-06 실측 요약
 
+> **이 실측은 17-dev 코어·17-dev DB 스키마 위에서 수행됐습니다** (리베이스 이전). Company 필드 39개·기본계정 12/12 같은 숫자는 16.33 기준이 아닙니다 — §4.1 경고와 §12 를 함께 읽으십시오. 16.33 재실측은 `bench migrate` 후로 미뤄져 있습니다(§10-1).
+>
+> 2026-09-07 리베이스 후 재확인된 것: 계정 324(그룹 52·원장 272), 차트 목록 노출, 트리 렌더 324/52/0, 훅 등록, 표준코드 272/unmapped 0, 세금 템플릿 Sales 3·Purchase 6·Item 3, 그리고 매입 PI·매입 PR·매출 SI 의 GL 이 §9.2 8-a/8-b 와 동일. **단 전표 3종은 17-dev 스키마 결손 5건을 하네스에서 우회한 뒤에야 통과했습니다.**
+
 회사 `SETIVE 훅검증`(약어 SHV, KRW, `Korea, Republic of`, 한국 차트)을 `bench execute` 안에서 `lang='ko'` 로 insert → 측정 → GL 스모크 → 역순 삭제. Error Log 4 → 4.
 
 | # | 항목 | 결과 |
@@ -355,7 +374,9 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 
 ## 10. 알려진 한계·후속 과제
 
-1. **환경 불일치 — 포크와 이미지 frappe 버전.** 이 체크아웃의 `erpnext/__init__.py` 는 `__version__ = "17.0.0-dev"` 이고 컨테이너 frappe 는 16.31.0 이다. 포크가 30개 파일 65곳에서 호출하는 `Meta.get_translated_label` 이 컨테이너 frappe 에 없어(`grep -c` 0) `Company.validate_warehouses` ([`company.py:326`](../../erpnext/setup/doctype/company/company.py) — 창고 필드가 채워지면 무조건 호출)와 `get_item_details.validate_conversion_rate` (`:1445`) 에서 AttributeError 가 난다. **훅이 창고 필드를 채운 뒤 웹 UI 에서 Company 를 저장하거나 전표 품목을 입력하면 500 이 예상된다.** E2E 는 프로세스 내 shim 으로 우회했다. 훅 결함이 아니라 이미지 태그(frappe)와 포크 브랜치의 정합 문제이며 사람 결정이 필요하다. 같은 사이트에서 `Contact.is_billing_contact` Custom Field 미적용(SQL 1054), `tabSales Invoice.po_no` 컬럼 타입 불일치(1366), 셋업 위저드 미완료도 확인됐다 — `bench migrate`(이번 작업에서 금지) 또는 위저드 완료가 해결책이다.
+1. ~~**환경 불일치 — 포크와 이미지 frappe 버전.**~~ **해소됨 (2026-09-06 리베이스).** 포크를 `develop`(17.0.0-dev) 에서 태그 `v16.33.0` 위로 리베이스해 `Meta.get_translated_label` 호출이 0건이 됐다. 재실측: `erpnext 16.33.0 / frappe 16.31.0`, `hasattr(Meta,'get_translated_label')` → `False`, 구 크래시 지점 `buying_controller.validate_from_warehouse` 직접 호출 시 `AttributeError` 가 아니라 정상 `ValidationError`. E2E 의 shim 은 더 이상 필요 없다. 사고 경위·재발 방지는 [KB-OPS-001 §1.7](./KB-OPS-001_tenant_provisioning_deployment.md) 로 옮겼다.
+   **다만 리베이스 직후 사이트에 `bench migrate` 를 돌리지 않아 DB 스키마가 17-dev 에 머물러 있다** — `Contact.is_billing_contact` 부재(1054)로 매입·매출 전표가 전부 막히고, 고아 DocType `Company Restriction` 과 `Supplier`/`Customer`/`Item` 의 `allowed_companies` 필드가 남아 `ImportError` 를 낸다. 사람 승인 시점에 `bench --site $SITE migrate` 를 실행한 뒤 §9.1 을 우회 없이 재실행해야 한다. 결손 목록과 복구 근거는 KB-OPS-001 §1.7.
+   **새 미해결 항목이 하나 생겼다:** `company_defaults.DEFAULTS` 의 세 필드가 16.33 Company 에 없다 (§4.1 경고).
 2. **Transit 창고 타입.** 위저드 밖에서 만든 회사는 `Warehouse Type "Transit"` 이 없어 코어 창고 생성이 실패할 수 있다. 앱 fixtures 또는 `after_migrate` 로 보장할지 결정 필요.
 3. **v16 신규 Company 필드는 비워 두었다** (과제 범위 20개 밖). `purchase_expense_account` / `purchase_expense_contra_account`, `expenses_added_to_stock_account` / `…_contra_account` 는 `Accounts Settings.book_stock_expense_gl_entries` 를 켜면 재고 품목 매입에서 throw 한다(`buying_controller.py:325-344`). `service_expense_account`(외주가공, 5248 후보), `unrealized_profit_loss_account`(내부거래)도 후속 결정.
 4. **Tax Rule 미생성** (§6.4).
@@ -381,4 +402,21 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 | 9 | `Company.setive_nts_map_revision` | 편집 가능 | `read_only` — 테넌트가 손으로 재매핑한 뒤 표식을 갱신할 길이 막힌다 |
 | 10 | `setive_nts_note` 에 서식 행 label 포함 | 포함 (`서식 행: <label> — <note>`) | 과제문은 '매핑 비고'만 명시. `values_for` 한 곳만 고치면 된다 |
 | 11 | v16 신규 Company 필드 (§10-3) | 비움 | `purchase_expense_*` 4개 · `service_expense_account` · `unrealized_profit_loss_account` 지정 여부 |
-| 12 | 이미지 frappe 태그 ↔ 포크 브랜치 정합 (§10-1) | 불일치 | 이미지 태그 상향 또는 포크를 v16.33 태그로 고정 |
+| 12 | ~~이미지 frappe 태그 ↔ 포크 브랜치 정합 (§10-1)~~ | **결정됨** — 포크를 이미지와 같은 `v16.33.0` 태그에 고정(2026-09-06 리베이스). 규약은 [`CLAUDE.md`](../../CLAUDE.md) "개발 환경 · 브랜치 규약" | — |
+| 13 | 기본 입고 창고 (§5) | 없음 — 16.33 에 `Company.default_warehouse` 필드가 없다 | `Stock Settings.default_warehouse` 전역 지정 / Item Default 경로 / 지정하지 않음 |
+| 14 | `company_defaults.DEFAULTS` 의 16.33 부재 필드 3개 (§4.1) | 그대로 씀 — 신규 16.33 사이트에서 1054 로 회사 생성 실패 | 세 항목 제거 + `meta.has_field` 필터로 `skipped` 처리 |
+
+---
+
+## 12. 이전 서술 정정
+
+초판(2026-09-06)은 포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있는 상태에서 작성·실측됐습니다. 2026-09-06 리베이스로 코어가 `v16.33.0` 이 되면서 아래 서술이 사실과 달라졌습니다. **어느 것도 앱 코드의 동작 변경 때문이 아니라 코어 버전이 바뀌었기 때문입니다.**
+
+- **§4.1 — `bank_charges_account` · `exchange_gain_account` · `exchange_loss_account` 는 16.33 Company 에 필드가 없습니다.** 초판은 12개 전부를 "훅이 채우는" 것으로 적고 실측 12/12 로 보고했으나, 그 실측은 17-dev 스키마 위에서 이뤄진 것입니다. 신규 16.33 사이트에서는 `OperationalError(1054)` 로 훅 전체가 실패합니다. 근거: `grep -c '"bank_charges_account"' erpnext/setup/doctype/company/company.json` → 0.
+- **§4.1 — `exchange_gain_loss_account`(5422) 는 폴백이 아니라 16.33 의 유일한 실현 환차손익 계정입니다.** 초판은 `erpnext/accounts/services/exchange_gain_loss.py` 가 gain/loss 를 분리 기표하므로 5422 에는 잔액이 안 생긴다고 적었으나, **16.33 에는 그 파일이 없습니다.** 4250 외환차익 / 5420 외환차손 분리 표시는 자동으로 되지 않으며 결산 대체분개가 필요합니다. 근거: `grep -rn "exchange_gain_account" --include='*.py' erpnext` → 0건, `grep -rln "exchange_gain_loss_account" --include='*.py' --include='*.js' erpnext | grep -v test` → 13건.
+- **§4.1 — 선수수익/선급비용의 근거를 `item_group.py:124-125` 에서 `stock/get_item_details.py` 의 `get_default_deferred_account` 로 바꿨습니다.** 16.33 `item_group.py` 에는 deferred 계정 캐스케이드가 없습니다(17-dev 전용). 기능 효과는 유지됩니다 — 16.33 은 `frappe.get_cached_value("Company", company, "default_" + fieldname)` 로 Company 값을 직접 읽습니다.
+- **§4.1 이 인용한 `bom/services/operations_cost.py` 와 §4.2 의 `item_standard_cost.py` 는 16.33 에 없는 파일입니다.** 5251 의 실제 소비처는 `bom.py:1615`, 2162 는 `purchase_invoice.py:1343` 이며 기능은 유지됩니다. 같은 이유로 §6.2 가 인용한 `accounts/services/taxes.py` 도 없어 `AccountsController.append_taxes_from_item_tax_template` 로, `gl_composer` 는 `sales_invoice.py:1710` 으로 바꿨습니다. 앱 소스 주석에도 같은 17-dev 경로(`purchase_receipt/services/provisional_accounting.py` 등)가 남아 있으니 함께 정리해야 합니다. 워킹트리에 `__pycache__` 만 남은 고아 디렉토리가 있어 `ls` 로는 존재하는 것처럼 보입니다 — `find erpnext -type d -name __pycache__ -prune -exec rm -rf {} +` 로 지웁니다.
+- **§4.2 — `Item Standard Cost` DocType 자체가 16.33 에 없습니다.** 초판의 "표준원가 테넌트가 나올 때 이 필드에 지정한다"는 안내를 따라가면 존재하지 않는 필드를 찾게 됩니다. 17 로 올라간 뒤로 유보합니다.
+- **§4.3 · §5 — `Company.default_warehouse` 는 16.33 에 없습니다.** 초판은 "`default_warehouse` 는 코어가 채운다"고 적었으나 16.33 `create_default_warehouses` 는 창고와 그룹만 만들고 Company 필드를 채우지 않습니다. 결과적으로 Stores 창고는 계정 1155 만 붙고 회사 단위 기본 창고로 지정되는 경로가 없습니다(§11-13). §4.3 제목의 "15 + 4" 숫자는 17-dev 실측 기준이라 뺐습니다 — 16.33 에서 재실측하기 전까지 숫자를 쓰지 않습니다.
+- **§4.1 · §4.3 · §5 의 `company.py` 라인 번호가 전부 어긋났습니다.** `set_default_accounts` 741 → 623, `validate_default_accounts` 360 → 248, `create_default_warehouses` 495 → 383, `validate_provisional_account_for_non_stock_items` 688 → 570. 다음 upstream 이동에도 견디도록 **함수명 기준 인용으로 바꿨습니다.** 이 문서의 남은 라인 번호(`stock/__init__.py`, `warehouse.py`, `work_order.py` 등)는 17-dev 시점 값이며 몇 줄씩 어긋날 수 있습니다. 확인은 `grep -n "def <함수명>" <파일>` 로 합니다.
+- **§10-1 의 환경 불일치는 해소됐습니다** (2026-09-06 리베이스). 대신 `bench migrate` 미실행 상태가 새 미해결 항목입니다.

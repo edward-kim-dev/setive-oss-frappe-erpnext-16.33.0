@@ -5,11 +5,11 @@ domain: 운영·배포
 status: active
 applies_to:
   - erpnext@16.33.0
-  - frappe@v16.33.0
+  - frappe@16.31.0            # 이미지 frappe/erpnext:v16.33.0 내장. 태그 숫자와 다르다 (§1.7)
   - docker/development/docker-compose.yml
-verified_on: 2026-09-04
-verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교)
-related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002, KB-KOR-003]
+verified_on: 2026-09-07
+verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교) + v16.33.0 리베이스 후 버전/스큐 재실측
+related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002, KB-KOR-003, KB-LOC-003]
 ---
 
 # KB-OPS-001: 테넌트 프로비저닝·배포 파이프라인
@@ -30,6 +30,8 @@ AI 에이전트가 ERPNext API로 만든 산출물을 어떻게 회수하고 배
 | `setive_erpnext_kr` | 별도 저장소 | ✅ | 한국화·테넌트 커스터마이징 전체 |
 
 `frappe`는 배포 대상이 아닙니다. [`docker/development/docker-compose.yml`](../../docker/development/docker-compose.yml)이 `frappe/erpnext:v16.33.0` 이미지를 쓰고, 그 위에 이 저장소를 `apps/erpnext` 자리에 바인드 마운트합니다. **`frappe` 코드는 이미지 태그를 올릴 때만 바뀝니다** — git 병합 정책과 무관한 별도 유입 경로입니다.
+
+→ 그래서 **포크 브랜치와 이미지 태그가 어긋나면 기동은 정상인 채로 전표 경로만 깨집니다.** 규칙과 확인 명령은 §1.7 에 있습니다.
 
 ### 1.1 저장소 구성 — 두 앱이 함께 배포된다
 
@@ -132,6 +134,123 @@ frappe
 ```
 
 `setive_erpnext_kr`을 추가하고 `bench install-app`을 1회 실행해야 사이트에 설치됩니다.
+
+### 1.7 포크 브랜치와 이미지 태그 정합 ★
+
+**규칙: 이 포크의 HEAD 는 compose 가 쓰는 이미지 태그와 같은 upstream 태그 위에 리베이스돼 있어야 한다.**
+
+```
+frappe/erpnext:v16.33.0 ─┬─ apps/frappe   16.31.0   ← 이미지 내장. 포크가 손댈 수 없다
+                         └─ apps/erpnext  16.33.0   ← 바인드 마운트로 포크가 통째로 가린다
+                                                       따라서 포크도 v16.33.0 위여야 한다
+```
+
+**이미지 태그 숫자와 그 안의 `frappe` 버전은 다릅니다.** `v16.33.0` 이미지가 내장한 frappe 는 `16.31.0` 입니다(§1.7 확인 명령 2로 실측). 태그를 보고 frappe 버전을 추정하지 마십시오.
+
+바인드 마운트는 `apps/erpnext` 만 덮습니다. 즉 **erpnext 만 포크 버전이 되고 frappe 는 이미지 버전으로 남는 것**이 두 앱의 버전이 갈라지는 유일한 지점이며, 갈라져도 컨테이너는 정상 기동합니다.
+
+#### 어긋나면 어떻게 깨지는가 — 2026-09-06 실사고
+
+포크가 upstream `develop`(erpnext `17.0.0-dev`) 위에 있었고 이미지는 `v16.33.0`(frappe 16.31.0) 이었습니다.
+
+- 17-dev 의 erpnext 는 frappe 17 에서 신설된 `Meta.get_translated_label` 을 **30개 파일 65곳**에서 호출합니다.
+- frappe 16.31.0 에는 그 메서드가 없습니다 → 호출 시점 `AttributeError`.
+- import 시점이 아니라 **호출 시점** 오류입니다. 기동·`bench` 명령·`/login` 은 전부 정상이고, 매입/매출 전표를 저장·제출할 때 비로소 500 이 납니다. **무증상 잠복형입니다.**
+- 대표 경로: [`erpnext/controllers/buying_controller.py`](../../erpnext/controllers/buying_controller.py) `validate_from_warehouse`, [`erpnext/controllers/accounts_controller.py`](../../erpnext/controllers/accounts_controller.py), 그리고 17-dev 의 `Company.validate_warehouses`(창고 필드가 채워져 있으면 무조건 호출 — KB-KOR-003 §10-1).
+
+해결은 포크를 이미지와 같은 `v16.33.0` 태그 위로 리베이스하는 것이었습니다(SETIVE 커밋 10개 재생).
+
+반대 방향(이미지가 포크보다 높음)도 같은 종류입니다. frappe 가 제거한 API 를 포크가 부르거나, frappe 쪽 DocType 스키마와 erpnext 코드가 어긋납니다.
+
+#### 확인 명령 — 세 곳의 숫자가 서로 맞아야 한다
+
+```bash
+COMPOSE=docker/development/docker-compose.yml
+SITE=localhost
+
+# 1. 포크 소스 (호스트). 기대: 16.33.0 / v16.33.0-<n>-g<sha>
+grep '^__version__' erpnext/__init__.py
+git describe --tags
+
+# 2. 이미지 내장 버전. compose 의 image: 태그를 그대로 넣는다
+docker run --rm --entrypoint sh frappe/erpnext:v16.33.0 -c \
+  "grep '^__version__' apps/erpnext/erpnext/__init__.py apps/frappe/frappe/__init__.py"
+# → apps/erpnext ... "16.33.0" / apps/frappe ... "16.31.0"
+
+# 3. 런타임에 실제로 로드된 것
+docker compose -f $COMPOSE exec -T backend \
+  /home/frappe/frappe-bench/env/bin/python -c \
+  "import frappe, erpnext; print(erpnext.__version__, frappe.__version__)"
+# → 16.33.0 16.31.0
+```
+
+1의 `git describe` 가 `v16.33.0-...` 이 아닌 다른 태그·브랜치를 가리키면 그 자체로 실패입니다. 2와 3의 `erpnext` 숫자가 다른 것은 정상입니다(3은 마운트된 포크를 읽음) — 단 **포크가 어느 태그 위에 있는지**로 1과 대조해야 합니다.
+
+> **`get_installed_apps_info` / About 대화상자로 버전을 판정하지 마십시오.** 브랜치명이 `master` 가 아니면 `frappe/utils/change_log.py::get_versions` 가 `hooks.<브랜치>_version` 을 함께 싣고, 프론트는 그쪽을 보여줍니다. 이 포크의 브랜치명은 `develop` 이고 [`erpnext/hooks.py`](../../erpnext/hooks.py) 의 `develop_version = "15.x.x-develop"` 은 upstream 이 갱신하지 않는 상수라, 실측 결과가 이렇게 나옵니다.
+>
+> ```
+> [{"app_name": "frappe", "version": "16.31.0", ...},
+>  {"app_name": "erpnext", "version": "15.x.x-develop (6eb555d)", "branch": "develop"}, ...]
+> ```
+>
+> `15.x.x` 는 **거짓 표시**입니다. 판정은 `erpnext.__version__`(위 3번)으로만 합니다.
+
+스큐 잔재 탐지 — 포크가 부르는데 컨테이너 frappe 에 없는 심볼이 있는지:
+
+```bash
+# 이번 사고의 심볼. 기대 0건
+grep -rn "get_translated_label" erpnext --include='*.py' | grep -v general_ledger
+docker compose -f $COMPOSE exec -T backend /home/frappe/frappe-bench/env/bin/python -c \
+  "from frappe.model.meta import Meta; print(hasattr(Meta,'get_translated_label'))"   # → False
+```
+
+> [`erpnext/accounts/report/general_ledger/general_ledger.py`](../../erpnext/accounts/report/general_ledger/general_ledger.py) 의 `get_translated_labels_for_totals` 는 이름만 비슷한 **지역 함수**입니다. grep 히트 2건은 무관합니다.
+
+#### 이미지 태그를 올릴 때 절차
+
+```bash
+git fetch upstream --tags                                   # upstream = frappe/erpnext
+git branch backup/develop-v16.33-$(date +%Y%m%d)            # 되돌릴 유일한 수단
+git rebase --onto v16.34.1 v16.33.0 develop                 # SETIVE 커밋만 새 태그 위로 재생
+# compose 의 image: 태그 상향 → up -d
+docker volume rm setive-erp-dev_erpnext-dist                # ★ 안 지우면 옛 번들 자산이 남는다 (§8.1)
+# 앱 pip 재설치 (§1.4) — 컨테이너 재생성으로 site-packages 링크가 사라진다
+docker compose -f $COMPOSE exec -T backend bench --site $SITE migrate   # ★ 아래
+# 위 확인 명령 3종 재실행
+```
+
+**`migrate` 를 빠뜨리면 코드만 새 태그가 되고 사이트 DB 는 옛 태그 스키마로 남습니다.** 리베이스는 파일만 바꿉니다(§2). 2026-09-06 리베이스 직후 `migrate` 없이 실측된 결손:
+
+| 결손 | 증상 |
+|---|---|
+| `Contact.is_billing_contact` Custom Field 부재 | `accounts/party.py` `get_default_contact` 가 SQL 1054 → `_get_party_details` 경유로 **매입·매출 전표 전부 차단** |
+| `tabInventory Dimension.mandatory_depends_on_backend` 컬럼 부재 | `stock_controller` validate 에서 1054 |
+| `Stock Settings.sample_retention_warehouse` DocField 부재 | `selling_controller.validate_sample_retention_warehouse` throw |
+| `tabSales Invoice.po_no` 가 `int(11)` (새 정의는 Data) | insert 시 1366 |
+
+`is_billing_contact` 는 erpnext 자신이 [`erpnext/setup/install.py`](../../erpnext/setup/install.py) 의 `Contact` 항목에서 만드는 Custom Field 이고 나머지 셋은 DocType 정의 동기화 대상입니다. 넷 다 `bench --site $SITE migrate` 가 복구합니다. **버전 스큐가 아니라 배포 절차 누락입니다** — erpnext 16.33.0 의 [`pyproject.toml`](../../pyproject.toml) 은 `[tool.bench.frappe-dependencies]` 에서 `frappe = ">=16.21.0,<17.0.0"` 을 선언하므로 frappe 16.31.0 은 호환 범위 안입니다.
+
+#### 태그를 내리는 방향(다운그레이드)의 잔재
+
+이전 태그에만 있던 DocType 은 새 태그에 JSON 이 없습니다. `bench migrate` 의 `remove_orphan_doctypes`(`frappe/model/sync.py`, `frappe/migrate.py:189`)가 컨트롤러 import 실패를 근거로 이런 DocType 을 찾아 `delete_doc(force=True)` 하므로 **DocType 정의와 그것을 참조하는 DocField 는 migrate 로 정리됩니다.**
+
+정리되지 않는 것은 **물리 테이블·컬럼**입니다(§7.1 부가 위험과 같은 성질). 실측 — 17-dev 잔재:
+
+```bash
+# migrate 전: 고아 DocType 과 이를 가리키는 필드가 남아 Supplier/Customer/Item insert 시 ImportError
+bench --site $SITE mariadb -e "select name,module,istable,custom from tabDocType where name='Company Restriction'"
+bench --site $SITE mariadb -e "select parent,fieldname from tabDocField where options='Company Restriction'"
+# migrate 후에도 남는 것: tabCompany.bank_charges_account 같은 컬럼 (UI 에 안 보이는 dead data)
+bench --site $SITE mariadb -e "select column_name from information_schema.columns \
+  where table_schema=database() and table_name='tabCompany' and column_name='bank_charges_account'"
+```
+
+빈 `__pycache__` 만 남은 소스 디렉토리도 같이 지웁니다(예: `erpnext/stock/doctype/company_restriction/`). git 추적 파일이 0건이라 `git status` 는 깨끗해 보이지만, 파이썬 **네임스페이스 패키지**로 잡혀 `erpnext.stock.doctype.company_restriction` 자체는 import 되고 하위 모듈만 없는 상태를 만들어 오류 메시지를 흐립니다. `ls`/`grep` 에 걸려 "이 기능이 현재 태그에 있다"는 착각도 부릅니다 — 이 문서 계열의 문서 인용 오류가 실제로 여기서 나왔습니다(KB-KOR-003 §12).
+
+```bash
+find erpnext -type d -name __pycache__ -prune -exec rm -rf {} +
+find erpnext -type d -empty -delete     # __pycache__ 만 있던 고아 디렉토리까지 정리
+```
 
 ---
 
@@ -446,7 +565,7 @@ docker compose -f "$COMPOSE" exec -T backend ls apps/erpnext/erpnext/public/dist
 - erpnext-dist:/home/frappe/frappe-bench/apps/erpnext/erpnext/public/dist
 ```
 
-**이미지 태그를 올린 뒤에는 이 볼륨을 삭제해야 새 자산이 반영됩니다.**
+**이미지 태그를 올린 뒤에는 이 볼륨을 삭제해야 새 자산이 반영됩니다.** 태그 상향은 포크 리베이스와 한 묶음입니다 (§1.7).
 
 ```bash
 docker volume rm setive-erp-dev_erpnext-dist
@@ -497,8 +616,20 @@ $EXEC grep -rn "bench migrate" /usr/local/bin/ ; echo "exit=$?"
 # 앱이 bench 가상환경에 설치돼 있는지 (시스템 파이썬이 아니라 env)
 $EXEC /home/frappe/frappe-bench/env/bin/python -c "import setive_erpnext_kr; print('OK')"
 
+# 포크 ↔ 이미지 태그 정합 (§1.7). 기대: 16.33.0 16.31.0 · v16.33.0-<n>-g<sha>
+$EXEC /home/frappe/frappe-bench/env/bin/python -c \
+  "import frappe, erpnext; print(erpnext.__version__, frappe.__version__)"
+git describe --tags
+
+# 버전 스큐 잔재 (§1.7). 기대: grep 0건 · hasattr False
+grep -rn "get_translated_label" erpnext --include='*.py' | grep -v general_ledger
+$EXEC /home/frappe/frappe-bench/env/bin/python -c \
+  "from frappe.model.meta import Meta; print(hasattr(Meta,'get_translated_label'))"
+
 # 사이트 응답
 curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8000/
+# 호스트 8000 을 다른 프로젝트가 점유하고 있으면 컨테이너 내부에서 확인한다
+$EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.0.0.1:8000/login
 ```
 
 ---
@@ -508,4 +639,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:8000/
 - **`developer_mode`가 꺼져 있다는 최초 판단은 오류였습니다.** `sites/localhost/site_config.json`만 확인한 결과이며, 실제 값은 `sites/common_site_config.json`의 `"developer_mode": 1`입니다. 설정 확인은 반드시 `common_site_config.json`을 함께 봐야 합니다.
 - **`sites/apps.txt` 수동 편집이 필요하다는 초기 서술을 철회합니다.** configurator entrypoint의 `ls -1 apps > sites/apps.txt`가 자동 생성하므로, 마운트 추가 후 스택 재기동만으로 등재됩니다 (§1.3).
 - 초판은 **앱의 pip 설치 단계를 누락**했습니다. 마운트와 `apps.txt` 등재만으로는 `bench`가 앱을 import하지 못합니다. §1.4로 보강했습니다.
+- **프런트매터의 `frappe@v16.33.0` 은 오류였습니다.** 이미지 태그가 `v16.33.0` 일 뿐이고 그 안의 frappe 는 `16.31.0` 입니다. 태그 숫자에서 frappe 버전을 추정한 서술이며 `frappe@16.31.0` 으로 정정했습니다 (2026-09-07, §1.7 확인 명령 2로 실측).
+- **초판에는 포크 브랜치와 이미지 태그의 정합 규칙이 없었습니다.** 2026-09-06 에 포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있고 이미지는 frappe 16.31.0 인 상태로 운영돼, 17-dev 가 30파일 65곳에서 부르는 `Meta.get_translated_label` 이 없어 매입·매출 전표 경로가 깨졌습니다. 기동·로그인은 정상이라 탐지되지 않았습니다. §1.7 을 신설했습니다 (2026-09-07).
+- **버전 판정에 `get_installed_apps_info`(About 대화상자)를 쓰면 안 됩니다.** 브랜치명이 `develop` 이면 `erpnext/hooks.py` 의 상수 `develop_version = "15.x.x-develop"` 이 표시됩니다. 실측에서 erpnext 16.33.0 이 `15.x.x-develop (6eb555d)` 으로 보고됐습니다 (§1.7).
 - §5.1 초판은 `install-app` → `migrate` 만으로 배포가 끝나는 것처럼 읽혔습니다. 앱의 Company 훅은 회사 저장 시에만 실행되므로 **앱 설치 전에 만든 회사에는 한국화 기본값이 적용되지 않습니다.** 3a 단계(`backfill`)를 추가했습니다 (2026-09-06, KB-KOR-003 §8 실측).

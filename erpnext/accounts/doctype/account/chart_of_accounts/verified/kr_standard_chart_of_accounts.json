@@ -1099,6 +1099,14 @@
           "account_number": "5421",
           "account_category": "Operating Expenses"
         },
+        "외환차손익": {
+          "account_number": "5422",
+          "account_category": "Operating Expenses"
+        },
+        "외화환산손익": {
+          "account_number": "5423",
+          "account_category": "Operating Expenses"
+        },
         "기부금": {
           "account_number": "5430",
           "account_category": "Operating Expenses"
@@ -1121,6 +1129,10 @@
         },
         "투자자산처분손실": {
           "account_number": "5451",
+          "account_category": "Operating Expenses"
+        },
+        "유형자산처분손익": {
+          "account_number": "5452",
           "account_category": "Operating Expenses"
         },
         "재고자산감모손실(비정상)": {

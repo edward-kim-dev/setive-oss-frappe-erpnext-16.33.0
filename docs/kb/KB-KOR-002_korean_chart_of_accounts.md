@@ -7,7 +7,7 @@ applies_to:
   - erpnext@16.33.0
   - frappe@v16
 verified_on: 2026-09-06
-verified_by: 소스 확인 + 개발 컨테이너 실측 (확정본 321계정으로 Company 생성·측정·삭제까지 완료)
+verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판으로 Company 생성·측정·삭제 완료, 324계정판은 로더·트리 렌더 확인)
 related: [KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 ---
 
@@ -17,8 +17,8 @@ related: [KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 
 | 산출물 | 위치 | 규모 |
 |---|---|---|
-| 계정과목표 (ERPNext verified 차트) | [`erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) | 321 계정 = 그룹 52 + 원장 269, 4자리 번호 |
-| 국세청 표준재무제표 코드 매핑 | `setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json` (형제 앱 저장소) | 원장 269 전부 배정: 재무상태표 137 · 손익계산서 92 · 제조원가명세서 35 · 대사전용 4 · 대상아님 1, 산식 행 34, 미검증 33 |
+| 계정과목표 (ERPNext verified 차트) | [`erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) | 324 계정 = 그룹 52 + 원장 272, 4자리 번호 |
+| 국세청 표준재무제표 코드 매핑 | `setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json` (형제 앱 저장소) | 원장 272 전부 배정: 재무상태표 137 · 손익계산서 92 · 제조원가명세서 35 · 대사전용 7 · 대상아님 1, 산식 행 34, 미검증 33 |
 | 생성·검증 스크립트 | `setive_erpnext_kr/scripts/coa/` (`tree_draft.json` → `build_kr_coa.py` → 차트, `build_nts_map.py` → 매핑, `validate_coa.py`, 서식 원본 추출 `nts_codes.json`) | 재실행하면 같은 파일이 나온다 (md5 일치 확인) |
 
 위저드 드롭다운 표시명은 **"한국 표준 계정과목표 (일반기업회계기준)"** 이며 `Company.chart_of_accounts` 에 이 문자열이 저장된다.
@@ -189,7 +189,7 @@ accounts        계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role
 
 1. **자본 카테고리 2종.** `Account Category` 에 자본용은 `Share Capital`·`Reserves and Surplus` 뿐이라 IFRS 재무상태표 템플릿에서 자본잉여금·자본조정·기타포괄손익누계액·이익잉여금이 한 행으로 합산된다. 트리는 5분류를 유지하므로 한국식 재무상태표 리포트는 트리 기준으로 만든다.
 2. **이름 매칭 6항목**(§6.2)은 JSON 만으로 채울 수 없다. 앱 `ko.po` 에서 msgid 번역을 덮는 방식은 Sales Invoice 의 'Write Off' 섹션 등 UI 문자열까지 바뀌므로 쓰지 않는다.
-3. **단일 손익 계정 부재.** 차트는 외환차익(4250)/외환차손(5420), 유형자산처분이익(4260)/처분손실(5450) 으로 손익을 분리하는데 코어의 `exchange_gain_loss_account`([`payment_entry.py:1142-1150`](../../erpnext/accounts/doctype/payment_entry/payment_entry.py) — 없으면 환차 전기 누락)·`disposal_account`([`depreciation.py:614`](../../erpnext/assets/doctype/asset/depreciation.py)) 는 단일 계정을 요구한다. 선택지: (i) 영업외비용에 `5422 외환차손익`·`5452 유형자산처분손익` 을 추가하고 훅이 지정, 결산 시 이익분 재분류 / (ii) `4250`·`4260` 을 지정하고 손실 시 차변 잔액 감수. **결정되지 않았다.**
+3. **단일 손익 계정 — 결정됨 (2026-09-06, 선택지 (i)).** 영업외비용에 `5422 외환차손익`·`5423 외화환산손익`·`5452 유형자산처분손익` 을 추가했다. 각각 코어의 `exchange_gain_loss_account`(폴백)·`unrealized_exchange_gain_loss_account`([`exchange_rate_revaluation.py:364`](../../erpnext/accounts/doctype/exchange_rate_revaluation/exchange_rate_revaluation.py) — 미설정 시 throw)·`disposal_account`([`sales_invoice_item.py:122`](../../erpnext/accounts/doctype/sales_invoice_item/sales_invoice_item.py)) 전용이며, 결산 시 차익은 4250/4251/4260, 차손은 5420/5421/5450 으로 대체해 잔액 0 을 만든다(매핑표 reconciliation '결산대체 완료'). **실현 환차손익은 v16 이 이미 분리 필드를 쓴다** — [`exchange_gain_loss.py:14-18`](../../erpnext/accounts/services/exchange_gain_loss.py) 가 `exchange_gain_account`/`exchange_loss_account` 를 우선하고 단일 계정은 폴백이므로, 훅이 4250/5420 을 분리 필드에 지정하면 5422 는 평소 잔액이 생기지 않는다.
 4. **세금 템플릿 0건.** `country_wise_tax.json` 의 한국 키는 `"South Korea"` 인데 `Company.country` 는 `"Korea, Republic of"` 라 `taxes_setup.py:20-22` 가 즉시 return 한다. 부가세 10% 템플릿은 앱 훅이 만든다(§11-3). 포크의 `country_wise_tax.json` 수정은 3단계 에스컬레이션 대상.
 5. **IFRS 현금흐름표 무형자산 행.** `standard_cash_flow_statement_(ifrs).json:426` 은 `account_category = Intangible Assets` 만 보고 유형자산 행(`:375`)과 달리 Accumulated Depreciation 제외 조건이 없어 상각 대변이 투자활동에 순액으로 섞인다. 상위 템플릿 한계 — 한국 현금흐름표 템플릿 과제.
 6. **서식 개정 대응.** `validate_coa.py` 가 `meta.*_revised` 와 `nts_codes.json` 의 `revised` 를 대조한다. 서식이 개정되면 PDF 재추출 → `nts_codes.json` 갱신 → 매핑 재검토 순서다. `is 220` 처럼 배열 끝에 코드가 붙으므로 items 는 읽기 순서이지 코드순이 아니다.
@@ -220,19 +220,19 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
   erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.get_charts_for_country \
   --kwargs "{'country':'Korea, Republic of','with_standard':True}"
 
-# 컨테이너: 위저드 미리보기 트리 렌더 — 기대: nodes 321 expandable 52 dup 0
+# 컨테이너: 위저드 미리보기 트리 렌더 — 기대: nodes 324 expandable 52 dup 0
 docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
   erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.build_tree_from_json \
   --kwargs "{'chart_template':'한국 표준 계정과목표 (일반기업회계기준)'}" 2>/dev/null \
   | python3 -c "import sys,json; r=sys.stdin.read(); d=json.loads(r[r.find('['):r.rfind(']')+1]); v=[x['value'] for x in d]; print('nodes',len(d),'expandable',sum(1 for x in d if x.get('expandable')),'dup',len(v)-len(set(v)))"
 ```
 
-2026-09-06 실측: 정적 검사 errors 0 · warnings 0, 목록 3건 노출, 트리 321/52/0. Company 생성 실측은 리뷰 전 판(296계정)에서 수행했고(296 삽입, NestedSet 결함 0, 접미사 0, 카테고리 없는 원장 0, Error Log 증가 0), 확정본은 구조 변경이 커서(계정 +25, 그룹화 3, 블록 순서 1) **회사 재생성은 하지 않았다.** 다음 위저드 실행 또는 아래 절차로 재확인한다.
+2026-09-06 실측: 321계정판으로 Company 생성·측정·삭제 완료(§12). 이후 단일 손익계정 3개를 더해 324계정이 됐고, 이 판은 정적 검사 errors 0 · warnings 0, 목록 노출, 트리 렌더 324/52/0 을 확인했다. 324판의 Company 생성 실측은 Company 훅 검증(KB-KOR-003)에서 함께 수행한다.
 
 ```bash
 # Company 생성 실측(트랜잭션 후 삭제). 위저드 미완료 사이트에서는 Warehouse Type 'Transit' 이 먼저 있어야 한다 (§9-9)
 docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
-  frappe.client.get_count --kwargs "{'doctype':'Account','filters':{'company':'<회사명>'}}"   # 기대 321
+  frappe.client.get_count --kwargs "{'doctype':'Account','filters':{'company':'<회사명>'}}"   # 기대 324
 ```
 
 ## 11. 후속 과제
@@ -257,3 +257,4 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 - 리뷰 전 매핑 규약 "매출원가·재료비는 영구재고 원장 잔액을 소계 행에 직접 배정" 은 폐기했다. 재료비는 재고에 흡수되어 이중계상되고 노무비·경비는 손익계산서에 도달하지 못했다(결함 1). 산식 행 `computed` 와 `reconcile_only` 로 대체.
 - 리뷰 전 매핑의 "차감계정은 서식의 괄호 행 코드에 대변잔액 그대로 배정" 은 `amount_convention` + `sign:-1` 로 형식화했다. 의미는 같다.
 - 리뷰안 중 채택하지 않은 것: 결함 7 의 교차 매핑(Income 계정 → 판관비 행 음수), 결함 10 의 5140 → mfg 39, 결함 11 의 1160 이동, 결함 3 의 리프 번호안(1160 을 유지하고 1161~1164 사용). 근거는 §8.
+- 2026-09-06 사용자 결정으로 §9-3 을 확정했다. 초판은 실현 환차손익도 단일 계정이 필요하다고 봤으나, v16 은 `exchange_gain_account`/`exchange_loss_account` 분리 필드를 우선 사용한다. 단일 계정이 실제로 필요한 것은 폴백·미실현 환산·자산처분 3곳이다.

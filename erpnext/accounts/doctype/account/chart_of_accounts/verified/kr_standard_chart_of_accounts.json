@@ -1,0 +1,1347 @@
+{
+  "country_code": "kr",
+  "name": "한국 표준 계정과목표 (일반기업회계기준)",
+  "tree": {
+    "자산": {
+      "root_type": "Asset",
+      "account_number": "1000",
+      "유동자산": {
+        "account_number": "1100",
+        "당좌자산": {
+          "account_number": "1110",
+          "소액현금": {
+            "account_number": "1112",
+            "account_type": "Cash",
+            "account_category": "Cash and Cash Equivalents"
+          },
+          "예금": {
+            "account_number": "1113",
+            "account_type": "Bank",
+            "당좌예금": {
+              "account_number": "1114",
+              "account_type": "Bank",
+              "account_category": "Cash and Cash Equivalents"
+            },
+            "보통예금": {
+              "account_number": "1115",
+              "account_type": "Bank",
+              "account_category": "Cash and Cash Equivalents"
+            }
+          },
+          "현금성자산": {
+            "account_number": "1117",
+            "account_category": "Cash and Cash Equivalents"
+          },
+          "단기투자자산": {
+            "account_number": "1120",
+            "단기금융상품": {
+              "account_number": "1121",
+              "account_category": "Short-term Investments"
+            },
+            "단기매매증권": {
+              "account_number": "1122",
+              "account_category": "Short-term Investments"
+            },
+            "단기대여금": {
+              "account_number": "1123",
+              "account_category": "Other Receivables"
+            },
+            "대손충당금(단기대여금)": {
+              "account_number": "1124",
+              "account_category": "Other Receivables"
+            },
+            "주주임원종업원단기대여금": {
+              "account_number": "1125",
+              "account_category": "Other Receivables"
+            },
+            "대손충당금(주주임원종업원단기대여금)": {
+              "account_number": "1126",
+              "account_category": "Other Receivables"
+            }
+          },
+          "기타당좌자산": {
+            "account_number": "1140",
+            "미수금": {
+              "account_number": "1141",
+              "account_type": "Receivable",
+              "account_category": "Other Receivables"
+            },
+            "대손충당금(미수금)": {
+              "account_number": "1142",
+              "account_category": "Other Receivables"
+            },
+            "선급금": {
+              "account_number": "1144",
+              "account_category": "Other Current Assets"
+            },
+            "가지급금": {
+              "account_number": "1147",
+              "account_category": "Other Current Assets"
+            }
+          },
+          "매출채권": {
+            "account_number": "1130",
+            "대손충당금(외상매출금)": {
+              "account_number": "1132",
+              "account_category": "Trade Receivables"
+            },
+            "받을어음": {
+              "account_number": "1133",
+              "account_type": "Receivable",
+              "account_category": "Trade Receivables"
+            },
+            "대손충당금(받을어음)": {
+              "account_number": "1134",
+              "account_category": "Trade Receivables"
+            },
+            "외상매출금": {
+              "account_number": "1131",
+              "account_type": "Receivable",
+              "account_category": "Trade Receivables"
+            }
+          },
+          "현금": {
+            "account_number": "1111",
+            "account_type": "Cash",
+            "account_category": "Cash and Cash Equivalents"
+          }
+        },
+        "재고자산": {
+          "account_number": "1150",
+          "account_type": "Stock",
+          "상품": {
+            "account_number": "1151",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "제품": {
+            "account_number": "1152",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "반제품": {
+            "account_number": "1153",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "재공품": {
+            "account_number": "1154",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "부재료": {
+            "account_number": "1156",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "저장품": {
+            "account_number": "1157",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "미착품": {
+            "account_number": "1158",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          },
+          "재고자산평가충당금": {
+            "account_number": "1159",
+            "재고자산평가충당금(상품)": {
+              "account_number": "1161",
+              "account_category": "Stock Assets"
+            },
+            "재고자산평가충당금(제품)": {
+              "account_number": "1162",
+              "account_category": "Stock Assets"
+            },
+            "재고자산평가충당금(원재료)": {
+              "account_number": "1163",
+              "account_category": "Stock Assets"
+            },
+            "재고자산평가충당금(재공품)": {
+              "account_number": "1164",
+              "account_category": "Stock Assets"
+            }
+          },
+          "재고출고미청구": {
+            "account_number": "1160",
+            "account_type": "Stock Delivered But Not Billed",
+            "account_category": "Stock Assets"
+          },
+          "원재료": {
+            "account_number": "1155",
+            "account_type": "Stock",
+            "account_category": "Stock Assets"
+          }
+        },
+        "기타유동자산": {
+          "account_number": "1170",
+          "부가세관련자산": {
+            "account_number": "1171",
+            "account_type": "Tax",
+            "부가세대급금": {
+              "account_number": "1172",
+              "account_type": "Tax",
+              "account_category": "Other Current Assets",
+              "tax_rate": 10
+            }
+          },
+          "미수수익": {
+            "account_number": "1173",
+            "account_category": "Other Receivables"
+          },
+          "선급비용": {
+            "account_number": "1174",
+            "account_category": "Other Current Assets"
+          },
+          "이연법인세자산(유동)": {
+            "account_number": "1175",
+            "account_category": "Other Current Assets"
+          },
+          "선납세금": {
+            "account_number": "1176",
+            "account_category": "Other Current Assets"
+          },
+          "기타유동자산(미분류)": {
+            "account_number": "1179",
+            "account_category": "Other Current Assets"
+          }
+        }
+      },
+      "비유동자산": {
+        "account_number": "1200",
+        "투자자산": {
+          "account_number": "1210",
+          "장기금융상품": {
+            "account_number": "1211",
+            "account_category": "Long-term Investments"
+          },
+          "매도가능증권": {
+            "account_number": "1212",
+            "account_category": "Long-term Investments"
+          },
+          "만기보유증권": {
+            "account_number": "1213",
+            "account_category": "Long-term Investments"
+          },
+          "지분법적용투자주식": {
+            "account_number": "1214",
+            "account_category": "Long-term Investments"
+          },
+          "장기대여금": {
+            "account_number": "1215",
+            "account_category": "Other Non-current Assets"
+          },
+          "대손충당금(장기대여금)": {
+            "account_number": "1216",
+            "account_category": "Other Non-current Assets"
+          },
+          "투자부동산": {
+            "account_number": "1217",
+            "account_type": "Fixed Asset",
+            "account_category": "Long-term Investments"
+          },
+          "감가상각누계액(투자부동산)": {
+            "account_number": "1218",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Long-term Investments"
+          },
+          "기타투자자산": {
+            "account_number": "1219",
+            "account_category": "Long-term Investments"
+          }
+        },
+        "무형자산": {
+          "account_number": "1260",
+          "영업권": {
+            "account_number": "1261",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "산업재산권": {
+            "account_number": "1262",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "개발비": {
+            "account_number": "1263",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "소프트웨어": {
+            "account_number": "1264",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "시설이용권": {
+            "account_number": "1265",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "기타무형자산": {
+            "account_number": "1269",
+            "account_type": "Fixed Asset",
+            "account_category": "Intangible Assets"
+          },
+          "상각누계액(영업권)": {
+            "account_number": "1270",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Intangible Assets"
+          },
+          "상각누계액(산업재산권)": {
+            "account_number": "1271",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Intangible Assets"
+          },
+          "상각누계액(개발비)": {
+            "account_number": "1272",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Intangible Assets"
+          },
+          "상각누계액(소프트웨어)": {
+            "account_number": "1273",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Intangible Assets"
+          }
+        },
+        "기타비유동자산": {
+          "account_number": "1280",
+          "임차보증금": {
+            "account_number": "1281",
+            "account_category": "Other Non-current Assets"
+          },
+          "기타보증금": {
+            "account_number": "1282",
+            "account_category": "Other Non-current Assets"
+          },
+          "장기미수금": {
+            "account_number": "1283",
+            "account_category": "Other Non-current Assets"
+          },
+          "장기선급비용": {
+            "account_number": "1284",
+            "account_category": "Other Non-current Assets"
+          },
+          "이연법인세자산(비유동)": {
+            "account_number": "1285",
+            "account_category": "Other Non-current Assets"
+          },
+          "기타비유동자산(미분류)": {
+            "account_number": "1289",
+            "account_category": "Other Non-current Assets"
+          }
+        },
+        "유형자산": {
+          "account_number": "1230",
+          "토지": {
+            "account_number": "1231",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "건물": {
+            "account_number": "1232",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(건물)": {
+            "account_number": "1233",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "구축물": {
+            "account_number": "1234",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(구축물)": {
+            "account_number": "1235",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "기계장치": {
+            "account_number": "1236",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(기계장치)": {
+            "account_number": "1237",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "차량운반구": {
+            "account_number": "1238",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(차량운반구)": {
+            "account_number": "1239",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "공구와기구": {
+            "account_number": "1240",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(공구와기구)": {
+            "account_number": "1241",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "비품": {
+            "account_number": "1242",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "시설장치": {
+            "account_number": "1244",
+            "account_type": "Fixed Asset",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(시설장치)": {
+            "account_number": "1245",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          },
+          "건설중인자산": {
+            "account_number": "1246",
+            "account_type": "Capital Work in Progress",
+            "account_category": "Tangible Assets"
+          },
+          "감가상각누계액(비품)": {
+            "account_number": "1243",
+            "account_type": "Accumulated Depreciation",
+            "account_category": "Tangible Assets"
+          }
+        }
+      },
+      "임시계정": {
+        "account_number": "1900",
+        "기초잔액가계정": {
+          "account_number": "1901",
+          "account_type": "Temporary",
+          "account_category": "Other Non-current Assets"
+        }
+      }
+    },
+    "부채": {
+      "root_type": "Liability",
+      "account_number": "2000",
+      "유동부채": {
+        "account_number": "2100",
+        "유동차입금": {
+          "account_number": "2120",
+          "단기차입금": {
+            "account_number": "2121",
+            "account_category": "Short-term Borrowings"
+          },
+          "유동성장기부채": {
+            "account_number": "2122",
+            "account_category": "Short-term Borrowings"
+          },
+          "당좌차월": {
+            "account_number": "2123",
+            "account_category": "Short-term Borrowings"
+          }
+        },
+        "미지급채무": {
+          "account_number": "2130",
+          "미지급금": {
+            "account_number": "2131",
+            "account_type": "Payable",
+            "account_category": "Other Payables"
+          },
+          "미지급비용": {
+            "account_number": "2132",
+            "account_category": "Other Payables"
+          },
+          "미지급배당금": {
+            "account_number": "2133",
+            "account_category": "Other Payables"
+          },
+          "미지급법인세": {
+            "account_number": "2134",
+            "account_category": "Current Tax Liabilities"
+          }
+        },
+        "선수금및선수수익": {
+          "account_number": "2140",
+          "선수금": {
+            "account_number": "2141",
+            "account_category": "Other Current Liabilities"
+          },
+          "선수수익": {
+            "account_number": "2142",
+            "account_category": "Other Current Liabilities"
+          }
+        },
+        "예수금": {
+          "account_number": "2150",
+          "account_type": "Tax",
+          "부가세예수금": {
+            "account_number": "2151",
+            "account_type": "Tax",
+            "account_category": "Current Tax Liabilities",
+            "tax_rate": 10
+          },
+          "제세예수금": {
+            "account_number": "2152",
+            "account_type": "Tax",
+            "account_category": "Current Tax Liabilities"
+          },
+          "사회보험예수금": {
+            "account_number": "2153",
+            "account_category": "Other Current Liabilities"
+          },
+          "예수보증금": {
+            "account_number": "2154",
+            "account_category": "Other Current Liabilities"
+          },
+          "기타예수금": {
+            "account_number": "2155",
+            "account_category": "Other Current Liabilities"
+          }
+        },
+        "미청구채무": {
+          "account_number": "2160",
+          "재고입고미청구": {
+            "account_number": "2161",
+            "account_type": "Stock Received But Not Billed",
+            "account_category": "Other Payables"
+          },
+          "용역수령미청구": {
+            "account_number": "2162",
+            "account_type": "Service Received But Not Billed",
+            "account_category": "Other Payables"
+          },
+          "자산취득미청구": {
+            "account_number": "2163",
+            "account_type": "Asset Received But Not Billed",
+            "account_category": "Other Payables"
+          }
+        },
+        "기타유동부채": {
+          "account_number": "2170",
+          "가수금": {
+            "account_number": "2171",
+            "account_category": "Other Current Liabilities"
+          },
+          "단기충당부채": {
+            "account_number": "2172",
+            "account_category": "Short-term Provisions"
+          },
+          "이연법인세부채(유동)": {
+            "account_number": "2173",
+            "account_category": "Other Current Liabilities"
+          },
+          "기초잔액단수차이": {
+            "account_number": "2174",
+            "account_type": "Round Off for Opening",
+            "account_category": "Other Current Liabilities"
+          },
+          "기타유동부채(미분류)": {
+            "account_number": "2179",
+            "account_category": "Other Current Liabilities"
+          }
+        },
+        "매입채무": {
+          "account_number": "2110",
+          "지급어음": {
+            "account_number": "2112",
+            "account_type": "Payable",
+            "account_category": "Trade Payables"
+          },
+          "외상매입금": {
+            "account_number": "2111",
+            "account_type": "Payable",
+            "account_category": "Trade Payables"
+          }
+        }
+      },
+      "비유동부채": {
+        "account_number": "2200",
+        "비유동차입금": {
+          "account_number": "2210",
+          "장기차입금": {
+            "account_number": "2211",
+            "account_category": "Long-term Borrowings"
+          },
+          "사채": {
+            "account_number": "2212",
+            "account_category": "Long-term Borrowings"
+          },
+          "사채할인발행차금": {
+            "account_number": "2213",
+            "account_category": "Long-term Borrowings"
+          },
+          "사채할증발행차금": {
+            "account_number": "2214",
+            "account_category": "Long-term Borrowings"
+          }
+        },
+        "퇴직급여부채": {
+          "account_number": "2220",
+          "퇴직급여충당부채": {
+            "account_number": "2221",
+            "account_category": "Long-term Provisions"
+          },
+          "퇴직연금운용자산": {
+            "account_number": "2222",
+            "account_category": "Long-term Provisions"
+          }
+        },
+        "기타비유동부채": {
+          "account_number": "2230",
+          "장기미지급금": {
+            "account_number": "2231",
+            "account_category": "Other Non-current Liabilities"
+          },
+          "임대보증금": {
+            "account_number": "2232",
+            "account_category": "Other Non-current Liabilities"
+          },
+          "장기충당부채": {
+            "account_number": "2233",
+            "account_category": "Long-term Provisions"
+          },
+          "이연법인세부채(비유동)": {
+            "account_number": "2234",
+            "account_category": "Other Non-current Liabilities"
+          },
+          "기타비유동부채(미분류)": {
+            "account_number": "2239",
+            "account_category": "Other Non-current Liabilities"
+          }
+        }
+      }
+    },
+    "자본": {
+      "root_type": "Equity",
+      "account_number": "3000",
+      "자본금": {
+        "account_number": "3100",
+        "보통주자본금": {
+          "account_number": "3110",
+          "account_type": "Equity",
+          "account_category": "Share Capital"
+        },
+        "우선주자본금": {
+          "account_number": "3120",
+          "account_type": "Equity",
+          "account_category": "Share Capital"
+        },
+        "출자금": {
+          "account_number": "3130",
+          "account_type": "Equity",
+          "account_category": "Share Capital"
+        },
+        "인출금": {
+          "account_number": "3140",
+          "account_type": "Equity",
+          "account_category": "Share Capital"
+        }
+      },
+      "자본잉여금": {
+        "account_number": "3200",
+        "주식발행초과금": {
+          "account_number": "3210",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "감자차익": {
+          "account_number": "3220",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "자기주식처분이익": {
+          "account_number": "3230",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "기타자본잉여금": {
+          "account_number": "3290",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        }
+      },
+      "자본조정": {
+        "account_number": "3300",
+        "주식할인발행차금": {
+          "account_number": "3310",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "자기주식": {
+          "account_number": "3320",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "감자차손": {
+          "account_number": "3330",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "자기주식처분손실": {
+          "account_number": "3340",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "미교부주식배당금": {
+          "account_number": "3350",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "주식매수선택권": {
+          "account_number": "3360",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "기타자본조정": {
+          "account_number": "3390",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        }
+      },
+      "기타포괄손익누계액": {
+        "account_number": "3400",
+        "매도가능증권평가손익": {
+          "account_number": "3410",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "해외사업환산손익": {
+          "account_number": "3420",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "파생상품평가손익": {
+          "account_number": "3430",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "재평가잉여금": {
+          "account_number": "3440",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        }
+      },
+      "이익잉여금": {
+        "account_number": "3500",
+        "이익준비금": {
+          "account_number": "3510",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "기타법정적립금": {
+          "account_number": "3520",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "임의적립금": {
+          "account_number": "3530",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        },
+        "미처분이익잉여금": {
+          "account_number": "3540",
+          "account_type": "Equity",
+          "account_category": "Reserves and Surplus"
+        }
+      }
+    },
+    "수익": {
+      "root_type": "Income",
+      "account_number": "4000",
+      "매출액": {
+        "account_number": "4100",
+        "제품매출": {
+          "account_number": "4110",
+          "국내제품매출": {
+            "account_number": "4111",
+            "account_type": "Income Account",
+            "account_category": "Revenue from Operations"
+          },
+          "수출제품매출": {
+            "account_number": "4112",
+            "account_type": "Income Account",
+            "account_category": "Revenue from Operations"
+          }
+        },
+        "상품매출": {
+          "account_number": "4120",
+          "국내상품매출": {
+            "account_number": "4121",
+            "account_type": "Income Account",
+            "account_category": "Revenue from Operations"
+          },
+          "수출상품매출": {
+            "account_number": "4122",
+            "account_type": "Income Account",
+            "account_category": "Revenue from Operations"
+          }
+        },
+        "용역매출": {
+          "account_number": "4130",
+          "account_type": "Income Account",
+          "account_category": "Revenue from Operations"
+        },
+        "공사수입": {
+          "account_number": "4140",
+          "account_type": "Income Account",
+          "account_category": "Revenue from Operations"
+        },
+        "부동산임대수입": {
+          "account_number": "4150",
+          "account_type": "Income Account",
+          "account_category": "Revenue from Operations"
+        },
+        "기타매출": {
+          "account_number": "4160",
+          "account_type": "Income Account",
+          "account_category": "Revenue from Operations"
+        },
+        "매출환입및에누리": {
+          "account_number": "4180",
+          "제품매출환입및에누리": {
+            "account_number": "4181",
+            "account_category": "Revenue from Operations"
+          },
+          "상품매출환입및에누리": {
+            "account_number": "4182",
+            "account_category": "Revenue from Operations"
+          }
+        },
+        "매출할인": {
+          "account_number": "4190",
+          "제품매출할인": {
+            "account_number": "4191",
+            "account_category": "Revenue from Operations"
+          },
+          "상품매출할인": {
+            "account_number": "4192",
+            "account_category": "Revenue from Operations"
+          }
+        }
+      },
+      "영업외수익": {
+        "account_number": "4200",
+        "이자수익": {
+          "account_number": "4210",
+          "account_category": "Investment Income"
+        },
+        "배당금수익": {
+          "account_number": "4220",
+          "account_category": "Investment Income"
+        },
+        "임대료": {
+          "account_number": "4230",
+          "account_category": "Other Operating Income"
+        },
+        "단기매매증권평가이익": {
+          "account_number": "4240",
+          "account_category": "Investment Income"
+        },
+        "단기매매증권처분이익": {
+          "account_number": "4241",
+          "account_category": "Investment Income"
+        },
+        "매도가능증권처분이익": {
+          "account_number": "4242",
+          "account_category": "Investment Income"
+        },
+        "외환차익": {
+          "account_number": "4250",
+          "account_category": "Other Operating Income"
+        },
+        "외화환산이익": {
+          "account_number": "4251",
+          "account_category": "Other Operating Income"
+        },
+        "유형자산처분이익": {
+          "account_number": "4260",
+          "account_category": "Other Operating Income"
+        },
+        "투자자산처분이익": {
+          "account_number": "4261",
+          "account_category": "Investment Income"
+        },
+        "기타대손충당금환입": {
+          "account_number": "4270",
+          "account_category": "Other Operating Income"
+        },
+        "채무면제이익": {
+          "account_number": "4271",
+          "account_category": "Other Operating Income"
+        },
+        "자산수증이익": {
+          "account_number": "4272",
+          "account_category": "Other Operating Income"
+        },
+        "보험차익": {
+          "account_number": "4273",
+          "account_category": "Other Operating Income"
+        },
+        "정부보조금수익": {
+          "account_number": "4274",
+          "account_category": "Other Operating Income"
+        },
+        "잡이익": {
+          "account_number": "4280",
+          "account_category": "Other Operating Income"
+        },
+        "전기오류수정이익": {
+          "account_number": "4290",
+          "account_category": "Other Operating Income"
+        }
+      }
+    },
+    "비용": {
+      "root_type": "Expense",
+      "account_number": "5000",
+      "매출원가": {
+        "account_number": "5100",
+        "상품매출원가": {
+          "account_number": "5110",
+          "account_type": "Cost of Goods Sold",
+          "account_category": "Cost of Goods Sold"
+        },
+        "기타매출원가": {
+          "account_number": "5130",
+          "account_type": "Cost of Goods Sold",
+          "account_category": "Cost of Goods Sold"
+        },
+        "재고자산감모손실": {
+          "account_number": "5140",
+          "account_type": "Stock Adjustment",
+          "account_category": "Cost of Goods Sold"
+        },
+        "재고자산평가손실": {
+          "account_number": "5141",
+          "account_category": "Cost of Goods Sold"
+        },
+        "재고취득부대비용": {
+          "account_number": "5150",
+          "account_type": "Expenses Included In Valuation",
+          "account_category": "Other Direct Costs"
+        },
+        "자산취득부대비용": {
+          "account_number": "5151",
+          "account_type": "Expenses Included In Asset Valuation",
+          "account_category": "Other Direct Costs"
+        },
+        "제품매출원가": {
+          "account_number": "5120",
+          "account_type": "Cost of Goods Sold",
+          "account_category": "Cost of Goods Sold"
+        }
+      },
+      "제조원가": {
+        "account_number": "5200",
+        "재료비": {
+          "account_number": "5210",
+          "원재료비": {
+            "account_number": "5211",
+            "account_category": "Cost of Goods Sold"
+          },
+          "부재료비": {
+            "account_number": "5212",
+            "account_category": "Cost of Goods Sold"
+          },
+          "기타재료비": {
+            "account_number": "5219",
+            "account_category": "Cost of Goods Sold"
+          }
+        },
+        "노무비": {
+          "account_number": "5220",
+          "임금": {
+            "account_number": "5221",
+            "account_category": "Other Direct Costs"
+          },
+          "상여금(제)": {
+            "account_number": "5222",
+            "account_category": "Other Direct Costs"
+          },
+          "잡급(제)": {
+            "account_number": "5223",
+            "account_category": "Other Direct Costs"
+          },
+          "퇴직급여(제)": {
+            "account_number": "5224",
+            "account_category": "Other Direct Costs"
+          },
+          "임원급여(제)": {
+            "account_number": "5225",
+            "account_category": "Other Direct Costs"
+          },
+          "임원퇴직급여(제)": {
+            "account_number": "5226",
+            "account_category": "Other Direct Costs"
+          }
+        },
+        "제조경비": {
+          "account_number": "5230",
+          "복리후생비(제)": {
+            "account_number": "5231",
+            "account_category": "Other Direct Costs"
+          },
+          "여비교통비(제)": {
+            "account_number": "5232",
+            "account_category": "Other Direct Costs"
+          },
+          "통신비(제)": {
+            "account_number": "5233",
+            "account_category": "Other Direct Costs"
+          },
+          "전력비(제)": {
+            "account_number": "5234",
+            "account_category": "Other Direct Costs"
+          },
+          "가스수도료": {
+            "account_number": "5235",
+            "account_category": "Other Direct Costs"
+          },
+          "세금과공과(제)": {
+            "account_number": "5236",
+            "account_category": "Other Direct Costs"
+          },
+          "감가상각비(제)": {
+            "account_number": "5237",
+            "account_type": "Depreciation",
+            "account_category": "Other Direct Costs"
+          },
+          "무형자산상각비(제)": {
+            "account_number": "5238",
+            "account_type": "Depreciation",
+            "account_category": "Other Direct Costs"
+          },
+          "지급임차료(제)": {
+            "account_number": "5239",
+            "account_category": "Other Direct Costs"
+          },
+          "수선비(제)": {
+            "account_number": "5240",
+            "account_category": "Other Direct Costs"
+          },
+          "보험료(제)": {
+            "account_number": "5241",
+            "account_category": "Other Direct Costs"
+          },
+          "차량유지비(제)": {
+            "account_number": "5242",
+            "account_category": "Other Direct Costs"
+          },
+          "운반비(제)": {
+            "account_number": "5243",
+            "account_category": "Other Direct Costs"
+          },
+          "교육훈련비(제)": {
+            "account_number": "5244",
+            "account_category": "Other Direct Costs"
+          },
+          "도서인쇄비(제)": {
+            "account_number": "5245",
+            "account_category": "Other Direct Costs"
+          },
+          "소모품비(제)": {
+            "account_number": "5246",
+            "account_category": "Other Direct Costs"
+          },
+          "지급수수료(제)": {
+            "account_number": "5247",
+            "account_category": "Other Direct Costs"
+          },
+          "외주가공비": {
+            "account_number": "5248",
+            "account_category": "Other Direct Costs"
+          },
+          "포장비(제)": {
+            "account_number": "5249",
+            "account_category": "Other Direct Costs"
+          },
+          "경상연구개발비(제)": {
+            "account_number": "5250",
+            "account_category": "Other Direct Costs"
+          },
+          "잡비(제)": {
+            "account_number": "5251",
+            "account_category": "Other Direct Costs"
+          },
+          "기업업무추진비(제)": {
+            "account_number": "5252",
+            "account_category": "Other Direct Costs"
+          },
+          "연구비(제)": {
+            "account_number": "5253",
+            "account_category": "Other Direct Costs"
+          },
+          "보관료(제)": {
+            "account_number": "5254",
+            "account_category": "Other Direct Costs"
+          },
+          "특허권사용료(제)": {
+            "account_number": "5255",
+            "account_category": "Other Direct Costs"
+          }
+        }
+      },
+      "영업외비용": {
+        "account_number": "5400",
+        "이자비용": {
+          "account_number": "5410",
+          "account_category": "Finance Costs"
+        },
+        "외환차손": {
+          "account_number": "5420",
+          "account_category": "Operating Expenses"
+        },
+        "외화환산손실": {
+          "account_number": "5421",
+          "account_category": "Operating Expenses"
+        },
+        "기부금": {
+          "account_number": "5430",
+          "account_category": "Operating Expenses"
+        },
+        "단기매매증권평가손실": {
+          "account_number": "5440",
+          "account_category": "Operating Expenses"
+        },
+        "단기매매증권처분손실": {
+          "account_number": "5441",
+          "account_category": "Operating Expenses"
+        },
+        "매도가능증권처분손실": {
+          "account_number": "5442",
+          "account_category": "Operating Expenses"
+        },
+        "유형자산처분손실": {
+          "account_number": "5450",
+          "account_category": "Operating Expenses"
+        },
+        "투자자산처분손실": {
+          "account_number": "5451",
+          "account_category": "Operating Expenses"
+        },
+        "재고자산감모손실(비정상)": {
+          "account_number": "5460",
+          "account_category": "Operating Expenses"
+        },
+        "매출채권처분손실": {
+          "account_number": "5470",
+          "account_category": "Finance Costs"
+        },
+        "기타대손상각비": {
+          "account_number": "5471",
+          "account_category": "Operating Expenses"
+        },
+        "잡손실": {
+          "account_number": "5480",
+          "account_category": "Operating Expenses"
+        },
+        "전기오류수정손실": {
+          "account_number": "5481",
+          "account_category": "Operating Expenses"
+        },
+        "단수차이": {
+          "account_number": "5490",
+          "account_type": "Round Off",
+          "account_category": "Operating Expenses"
+        }
+      },
+      "법인세비용": {
+        "account_number": "5500",
+        "당기법인세비용": {
+          "account_number": "5510",
+          "account_category": "Tax Expense"
+        },
+        "이연법인세비용": {
+          "account_number": "5520",
+          "account_category": "Tax Expense"
+        }
+      },
+      "판매비와관리비": {
+        "account_number": "5300",
+        "급여": {
+          "account_number": "5301",
+          "account_category": "Operating Expenses"
+        },
+        "상여금": {
+          "account_number": "5302",
+          "account_category": "Operating Expenses"
+        },
+        "잡급": {
+          "account_number": "5303",
+          "account_category": "Operating Expenses"
+        },
+        "퇴직급여": {
+          "account_number": "5304",
+          "account_category": "Operating Expenses"
+        },
+        "복리후생비": {
+          "account_number": "5305",
+          "account_category": "Operating Expenses"
+        },
+        "여비교통비": {
+          "account_number": "5306",
+          "account_category": "Operating Expenses"
+        },
+        "기업업무추진비": {
+          "account_number": "5307",
+          "account_category": "Operating Expenses"
+        },
+        "통신비": {
+          "account_number": "5308",
+          "account_category": "Operating Expenses"
+        },
+        "수도광열비": {
+          "account_number": "5309",
+          "account_category": "Operating Expenses"
+        },
+        "세금과공과": {
+          "account_number": "5310",
+          "account_category": "Operating Expenses"
+        },
+        "무형자산상각비": {
+          "account_number": "5312",
+          "account_type": "Depreciation",
+          "account_category": "Operating Expenses"
+        },
+        "지급임차료": {
+          "account_number": "5313",
+          "account_category": "Operating Expenses"
+        },
+        "수선비": {
+          "account_number": "5314",
+          "account_category": "Operating Expenses"
+        },
+        "보험료": {
+          "account_number": "5315",
+          "account_category": "Operating Expenses"
+        },
+        "차량유지비": {
+          "account_number": "5316",
+          "account_category": "Operating Expenses"
+        },
+        "운반비": {
+          "account_number": "5317",
+          "account_type": "Chargeable",
+          "account_category": "Operating Expenses"
+        },
+        "교육훈련비": {
+          "account_number": "5318",
+          "account_category": "Operating Expenses"
+        },
+        "도서인쇄비": {
+          "account_number": "5319",
+          "account_category": "Operating Expenses"
+        },
+        "소모품비": {
+          "account_number": "5320",
+          "account_category": "Operating Expenses"
+        },
+        "사무용품비": {
+          "account_number": "5321",
+          "account_category": "Operating Expenses"
+        },
+        "지급수수료": {
+          "account_number": "5322",
+          "account_category": "Operating Expenses"
+        },
+        "광고선전비": {
+          "account_number": "5323",
+          "account_category": "Operating Expenses"
+        },
+        "판매촉진비": {
+          "account_number": "5324",
+          "account_category": "Operating Expenses"
+        },
+        "대손상각비": {
+          "account_number": "5325",
+          "account_category": "Operating Expenses"
+        },
+        "경상연구개발비": {
+          "account_number": "5326",
+          "account_category": "Operating Expenses"
+        },
+        "포장비": {
+          "account_number": "5327",
+          "account_category": "Operating Expenses"
+        },
+        "견본비": {
+          "account_number": "5328",
+          "account_category": "Operating Expenses"
+        },
+        "건물관리비": {
+          "account_number": "5329",
+          "account_category": "Operating Expenses"
+        },
+        "보관료": {
+          "account_number": "5330",
+          "account_category": "Operating Expenses"
+        },
+        "판매수수료": {
+          "account_number": "5331",
+          "account_category": "Operating Expenses"
+        },
+        "외주용역비": {
+          "account_number": "5332",
+          "account_category": "Operating Expenses"
+        },
+        "회의비": {
+          "account_number": "5333",
+          "account_category": "Operating Expenses"
+        },
+        "판매보증비": {
+          "account_number": "5334",
+          "account_category": "Operating Expenses"
+        },
+        "전력비": {
+          "account_number": "5335",
+          "account_category": "Operating Expenses"
+        },
+        "임원급여": {
+          "account_number": "5336",
+          "account_category": "Operating Expenses"
+        },
+        "임원상여금": {
+          "account_number": "5338",
+          "account_category": "Operating Expenses"
+        },
+        "잡비": {
+          "account_number": "5339",
+          "account_category": "Operating Expenses"
+        },
+        "임원퇴직급여": {
+          "account_number": "5340",
+          "account_category": "Operating Expenses"
+        },
+        "연구비": {
+          "account_number": "5341",
+          "account_category": "Operating Expenses"
+        },
+        "인적용역비": {
+          "account_number": "5342",
+          "account_category": "Operating Expenses"
+        },
+        "특허권사용료": {
+          "account_number": "5343",
+          "account_category": "Operating Expenses"
+        },
+        "수출제비용": {
+          "account_number": "5344",
+          "account_category": "Operating Expenses"
+        },
+        "대손충당금환입": {
+          "account_number": "5345",
+          "account_category": "Operating Expenses"
+        },
+        "감가상각비": {
+          "account_number": "5311",
+          "account_type": "Depreciation",
+          "account_category": "Operating Expenses"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,259 @@
+---
+id: KB-KOR-002
+title: 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑
+domain: 한국화
+status: active
+applies_to:
+  - erpnext@16.33.0
+  - frappe@v16
+verified_on: 2026-09-06
+verified_by: 소스 확인 + 개발 컨테이너 실측 (확정본 321계정으로 Company 생성·측정·삭제까지 완료)
+related: [KB-OPS-001, KB-KOR-001, ONT-CLS-001]
+---
+
+# KB-KOR-002: 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑
+
+## 1. 요약
+
+| 산출물 | 위치 | 규모 |
+|---|---|---|
+| 계정과목표 (ERPNext verified 차트) | [`erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) | 321 계정 = 그룹 52 + 원장 269, 4자리 번호 |
+| 국세청 표준재무제표 코드 매핑 | `setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json` (형제 앱 저장소) | 원장 269 전부 배정: 재무상태표 137 · 손익계산서 92 · 제조원가명세서 35 · 대사전용 4 · 대상아님 1, 산식 행 34, 미검증 33 |
+| 생성·검증 스크립트 | `setive_erpnext_kr/scripts/coa/` (`tree_draft.json` → `build_kr_coa.py` → 차트, `build_nts_map.py` → 매핑, `validate_coa.py`, 서식 원본 추출 `nts_codes.json`) | 재실행하면 같은 파일이 나온다 (md5 일치 확인) |
+
+위저드 드롭다운 표시명은 **"한국 표준 계정과목표 (일반기업회계기준)"** 이며 `Company.chart_of_accounts` 에 이 문자열이 저장된다.
+
+## 2. 왜 포크에 두는가
+
+`get_chart()` / `get_charts_for_country()` 는 `os.path.dirname(__file__)` 아래 `verified/` 폴더만 스캔한다 ([`chart_of_accounts.py:102`](../../erpnext/accounts/doctype/account/chart_of_accounts/chart_of_accounts.py), `:135`, `:159`). 설치 앱을 순회하지 않으므로 `setive_erpnext_kr` 에서 차트를 주입할 방법이 없다. [`CLAUDE.md`](../../CLAUDE.md) 의 "포크 수정이 허용되는 확정 예외" 표가 `kr_*.json` **신규 파일 추가**를 허용하는 근거가 이것이다. 기존 파일은 건드리지 않는다.
+
+인식 조건은 두 가지다. 파일명이 `kr` 로 시작하고(`Country` 문서 `Korea, Republic of` 의 `code` = `kr`, `:159`), 최상위 키가 `country_code` / `name` / `tree` 여야 한다(`:129-131`). 트리 키는 한글 그대로 쓴다(대만 차트가 한자 키를 쓰는 선례). 번역 파일(`erpnext/locale/ko.po`)은 건드리지 않는다.
+
+## 3. 설계 결정 4가지
+
+| # | 결정 | 근거 |
+|---|---|---|
+| 1 | **COA 1벌 — 일반기업회계기준 기반.** 중소기업회계기준은 같은 트리에서 계정을 덜 쓴다. K-IFRS 벌은 만들지 않는다 | SETIVE 타깃 테넌트(비상장 중소·중견)는 일반기업회계기준 적용 대상. 벌을 나누면 매핑·훅·리포트가 이중이 된다 |
+| 2 | **4자리 계층형 번호** — `1000 자산 / 1100 유동자산 / 1110 당좌자산 / 1111 현금 … 2000 부채 / 3000 자본 / 4000 수익 / 5000 비용` | `Account.autoname` 이 `번호 - 이름 - 약어` 이므로 번호 유일성이 곧 문서명 유일성. 국세청 코드와 달리 번호대만 보고 루트를 알 수 있다 |
+| 3 | **국세청 표준재무제표 코드 매핑을 COA 와 동시에 확정하되 별도 파일**로 둔다 | 트리 노드가 인식하는 메타 키는 정확히 8개(`account_name, account_number, account_type, account_category, root_type, is_group, tax_rate, account_currency`, `get_chart_metadata_fields` `:283`). **그 외 키는 자식 계정 이름으로 삽입**되므로 JSON 안에 코드를 넣을 수 없다 |
+| 4 | **초기 타깃은 제조업.** 제조원가(`5200`: 재료비·노무비·제조경비, `(제)` 접미)와 판매비와관리비(`5300`)를 **이중 계정군**으로 개설 | 제조업 법인세 신고는 제조원가명세서가 필수 부속명세서. 서비스·유통 테넌트는 `5200` 을 쓰지 않으면 된다. Company 기본계정도 제조 기준(§6) |
+
+## 4. 트리 구조 요약
+
+전체 목록은 파일을 직접 본다. 아래는 2단계까지의 골격과 계정 수(그룹/원장)다.
+
+| 루트 | 2단계 | 3단계 그룹 | 그룹/원장 |
+|---|---|---|---|
+| **1000 자산** (17/80) | 1100 유동자산 | 1110 당좌자산 · 1150 재고자산 · 1170 기타유동자산 | 9/38 |
+| | 1200 비유동자산 | 1210 투자자산 · 1230 유형자산 · 1260 무형자산 · 1280 기타비유동자산 | 4/41 |
+| | 1900 임시계정 | 1901 기초잔액가계정 (Temporary) | 0/1 |
+| **2000 부채** (13/35) | 2100 유동부채 | 2110 매입채무 · 2120 유동차입금 · 2130 미지급채무 · 2140 선수금및선수수익 · 2150 예수금 · 2160 미청구채무 · 2170 기타유동부채 | 7/24 |
+| | 2200 비유동부채 | 2210 비유동차입금 · 2220 퇴직급여부채 · 2230 기타비유동부채 | 3/11 |
+| **3000 자본** (6/23) | 3100 자본금 · 3200 자본잉여금 · 3300 자본조정 · 3400 기타포괄손익누계액 · 3500 이익잉여금 | — | 5분류 그대로 |
+| **4000 수익** (7/29) | 4100 매출액 | 4110 제품매출 · 4120 상품매출 · 4180 매출환입및에누리 · 4190 매출할인 | 4/12 |
+| | 4200 영업외수익 | — | 0/17 |
+| **5000 비용** (9/102) | 5100 매출원가 | — | 0/7 |
+| | 5200 제조원가 | 5210 재료비(3) · 5220 노무비(6) · 5230 제조경비(25) | 3/34 |
+| | 5300 판매비와관리비 | — | 0/44 |
+| | 5400 영업외비용 | — | 0/15 |
+| | 5500 법인세비용 | — | 0/2 |
+
+차감계정은 별도 원장으로 둔다(대손충당금 5, 감가상각누계액 8, 상각누계액 4, 재고자산평가충당금 4, 매출환입·할인 4, 대손충당금환입 1). ERPNext 는 잔액 부호로만 구분하므로 재무제표(IFRS 템플릿)는 `account_category` 로 순액 집계한다.
+
+**JSON 안의 형제 순서는 번호순이 아니며 의도된 것이다.** 이유는 §6. 정렬하거나 `frappe.as_json`(`sort_keys=True`) 으로 재직렬화하면 Company 기본계정이 조용히 바뀐다.
+
+## 5. ERPNext 필수 `account_type` 매핑표
+
+코어가 `account_type` 으로 찾는 계정이다. 빠지면 Company 생성이 실패하지는 않지만 해당 기능이 막힌다. 검사는 `validate_coa.py` (6).
+
+| account_type | 계정 | 코어 사용처 |
+|---|---|---|
+| Cash | 1111 현금, 1112 소액현금 | `default_cash_account` |
+| Bank | **그룹** 1113 예금 / 원장 1114 당좌예금, 1115 보통예금 | `default_bank_account`; Bank Account 생성 시 부모 그룹 |
+| Receivable | 1131 외상매출금, 1133 받을어음, 1141 미수금 | `default_receivable_account`, 거래처 원장 |
+| Payable | 2111 외상매입금, 2112 지급어음, 2131 미지급금 | `default_payable_account` |
+| Stock | 그룹 1150 / 1151~1158 재고 8종 | `default_inventory_account`, 창고 계정 |
+| Stock Received But Not Billed / Stock Delivered But Not Billed | 2161 재고입고미청구 / 1160 재고출고미청구 | 영구재고 입출고·청구 대체 |
+| Service Received But Not Billed / Asset Received But Not Billed | 2162 용역수령미청구 / 2163 자산취득미청구 | 구매영수증 대체 |
+| Expenses Included In Valuation / …In Asset Valuation | 5150 재고취득부대비용 / 5151 자산취득부대비용 | 부대비용 원가 산입 |
+| Stock Adjustment | 5140 재고자산감모손실 | `stock_adjustment_account` (재고실사 차액) |
+| Cost of Goods Sold | 5110 상품매출원가, 5120 제품매출원가, 5130 기타매출원가 | `default_expense_account` |
+| Fixed Asset | 유형 8(1231~1244 토지·건물·구축물·기계장치·차량운반구·공구와기구·비품·시설장치), 1217 투자부동산, 무형 6(1261~1269) | Asset Category `fixed_asset_account` — 타입이 정확히 Fixed Asset 이어야 저장 ([`asset_category.py:72`](../../erpnext/assets/doctype/asset_category/asset_category.py)) |
+| Accumulated Depreciation | 유형 7(1233~1245), 1218 투자부동산, 무형 4(1270~1273) | `accumulated_depreciation_account`, Asset Category |
+| Depreciation | 5311 감가상각비, 5312 무형자산상각비, 5237·5238 (제) | `depreciation_expense_account` |
+| Capital Work in Progress | 1246 건설중인자산 | `capital_work_in_progress_account` |
+| Round Off / Round Off for Opening | 5490 단수차이 / 2174 기초잔액단수차이 | 단수차 전기; 기초잔액 전표 ([`general_ledger.py:484`](../../erpnext/accounts/general_ledger.py)) |
+| Temporary | 1901 기초잔액가계정 | Opening Invoice Creation Tool |
+| Tax | **그룹** 1171 부가세관련자산(자산) · 2150 예수금(부채); 원장 1172 부가세대급금(10%), 2151 부가세예수금(10%), 2152 제세예수금 | `taxes_setup.get_or_create_tax_group` 이 자산·부채 양쪽 Tax 그룹을 먼저 찾는다 — 없으면 `관세 및 세금`/`세금 자산` 그룹을 새로 만든다 |
+| Income Account | 4111~4160 매출 8종 | `default_income_account` |
+| Equity | 자본 원장 23 전부 | 자본 계정 필터 |
+| Chargeable | 5317 운반비 | Taxes and Charges 의 'Actual' 행 |
+
+## 6. Company 기본계정은 무엇으로 잡히는가
+
+### 6.1 삽입 순서가 기본계정을 정한다
+
+`set_default_accounts()` ([`company.py:741`](../../erpnext/setup/doctype/company/company.py)) 는 `frappe.db.get_value("Account", {"account_type": T, "is_group": 0, "company": ...})` 로 찾는데 dict 필터 `get_value` 는 `ORDER BY creation DESC` 다. 즉 **같은 타입 원장이 여럿이면 트리에서 마지막에 삽입된 것**이 기본계정이다. 반대로 `default_income_account` 는 `get_all`(creation ASC) 의 **첫 번째**다(`:767-783`). 트리 삽입 순서 = JSON 형제 순서이므로 `build_kr_coa.py` 의 `DEFAULTS_LAST` / `DEFAULTS_FIRST` 가 해당 계정을 형제 중 마지막(첫)으로 옮기고, `validate_coa.py` (11) 이 이를 검사한다.
+
+| 타입 | 마지막(첫) 삽입 원장 | 채워지는 필드 |
+|---|---|---|
+| Receivable | 1131 외상매출금 | `default_receivable_account` |
+| Payable | 2111 외상매입금 | `default_payable_account` |
+| Cash | 1111 현금 | `default_cash_account` |
+| Bank | 1115 보통예금 | `default_bank_account` |
+| Stock | 1155 원재료 | `default_inventory_account` (제조 기준) |
+| Cost of Goods Sold | 5120 제품매출원가 | `default_expense_account` (제조 기준) |
+| Depreciation | 5311 감가상각비 | `depreciation_expense_account` |
+| Accumulated Depreciation | 1243 감가상각누계액(비품) | `accumulated_depreciation_account` |
+| Income Account (첫) | 4111 국내제품매출 | `default_income_account` (제조 기준) |
+
+이 때문에 `무형자산`(1260) 블록이 `유형자산`(1230) 블록보다 **앞에** 놓여 있다 — 무형자산 상각누계액(1270~1273)이 뒤에 삽입되면 `accumulated_depreciation_account` 를 가로챈다. 같은 타입 원장을 트리 뒤쪽에 추가할 때는 이 규칙을 먼저 본다.
+
+### 6.2 실측 (리뷰 전 296계정 판, ko 세션, 2026-09-06)
+
+Company 기본 필드 39개 중 21개가 채워졌다: 위 9개 + `round_off_account` 5490, `stock_adjustment_account` 5140, `stock_received_but_not_billed` 2161, `stock_delivered_but_not_billed` 1160, `capital_work_in_progress_account` 1246, `asset_received_but_not_billed` 2163, `write_off_account`·`bank_charges_account`(이름 매칭, 확정본에서는 계정 삭제 → 비어 있음), 코스트센터 3(`기본 - 약어`), `default_warehouse`(`백화점 - 약어`, §9-7).
+
+**비는 필드**: `exchange_gain_loss_account`, `exchange_gain_account`, `exchange_loss_account`, `unrealized_exchange_gain_loss_account`, `disposal_account`, `round_off_for_opening`, `default_deferred_revenue/expense_account`, `default_purchase_price_variance_account`, `default_manufacturing_variance_account`, `default_discount_account`, `default_provisional_account`, `default_advance_received/paid_account`, `default_operating_cost_account`, 창고 4종. 이 중 코어가 **번역된 이름**으로만 찾는 6개(`_("Write Off")`, `_("Bank Charges")`, `_("Exchange Gain/Loss")`, `_("Exchange Gain")`, `_("Exchange Loss")`, `_("Gain/Loss on Asset Disposal")`, `company.py:790-826`)는 한국 계정명으로는 절대 잡히지 않는다. 앱 훅이 번호로 채운다(§11-1).
+
+## 7. 표준재무제표 코드 매핑 파일
+
+### 7.1 근거 서식
+
+| 키 | 서식 | 개정일 | 비고 |
+|---|---|---|---|
+| `bs` | 법인세법 시행규칙 별지 제3호의2서식(1) 표준재무상태표(일반법인용) | 2021-10-28 | 287행 |
+| `is` | 별지 제3호의3서식(1) 표준손익계산서(일반법인용) | 2024-03-22 | 199행. 36.인적용역비(220) 신설 |
+| `mfg` | 별지 제3호의3서식(3) 부속명세서 1. 제조원가명세서 | 2023-03-20 | 45행 |
+
+법령 PDF 원본(`law.go.kr`)에서 추출한 코드표가 `scripts/coa/nts_codes.json` 이며 원본 sha256 이 `meta.source_pdf_sha256` 에 있다. 코드 체계는 **서식마다 1부터** 시작하므로 (서식, 코드) 쌍으로만 식별한다 — `is 44 ≠ mfg 44`. 적용 사업연도 2024 이후.
+
+### 7.2 형식 (schema 2)
+
+```
+meta            서식·개정일·출처·규약(amount_convention, aggregation, conventions)·미검증 목록·건수
+account_sets    산식에 쓰는 계정 집합 (GOODS/FG/WIP/RM 과 각 평가충당금, INV_ALL, COGS_ADJ, MFG_COST)
+computed_ops    opening_balance · closing_balance · movement · formula · ref · children · constant 정의
+computed        서식별 산식 행 (mfg 1·2·3·4·44~49, is 36~47·66·129·217·219 등 34행)
+reconciliation  항등식 3개 (매출원가 항등식, mfg 49 = is 44, 재고 순액 대사)
+accounts        계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role?, note?, unverified?}
+```
+
+핵심 규약만 적는다(전문은 파일의 `meta`).
+
+- **amount**: 루트 정상 잔액 방향 기준(자산·비용 = 차−대, 부채·자본·수익 = 대−차). 차감계정은 자연히 음수.
+- **sign**: 서식에 괄호(차감) 행이 있으면 그 행에 `sign:-1`(양수 표시), 없으면 모행에 그대로(순액). 재고자산평가충당금·상각누계액·매출환입·매출할인·대손충당금환입이 순액 반영 대상.
+- **level:parent**: 자식 행이 있는 상위 행에 직접 배정한 것(1217·1218 투자부동산, 5130 기타매출원가, 5211~5219 재료비). 행 값 = 직접 배정 + 자식 합.
+- **role:reconcile_only**: 서식 행에 배정하지 않는 영구재고 원장(5110·5120·5140·5141). 매출원가는 `computed` 산식(기초 + 당기 − 기말 − 타계정대체)으로 구하고, `gl(5110)+gl(5120)+gl(5130)+gl(5140)+gl(5141)+gl(5150)+net(MFG_COST) == is.35` 로 대사한다. Stock Entry 추가원가로 재공품·제품에 흡수되지 않은 제조원가(`net(MFG_COST)`)는 배부 대체분개를 하지 않으면 전액 당기 매출원가로 귀속된다.
+- **movement 의 상대계정 제외**: 재고 집합 내부 이동(원재료→재공품→제품)과 제조원가 흡수(대변)는 매입·타계정대체에서 빠지도록 `except_counter` 로 지정한다. 구현은 전표 단위로 상대계정을 구해야 한다(GL Entry `against` 필드는 다건 전표에서 부정확).
+
+### 7.3 미검증 코드 (세무 검토 후 확정)
+
+서식에 직접 대응하는 행이 없어 조립자 판단으로 배정한 33건. `meta.unverified_codes` 와 각 항목 `note` 에 근거가 있다.
+
+`1147 1160 1284 1901 2153 2161 2162 2163 2171 2174 2213 2214 3130 3520 4130 4140 4150 4261 5150 5151 5211 5212 5219 5238 5313 5321 5322 5327 5332 5333 5334 5451 5490`
+
+`3140 인출금`은 개인사업자 전용이라 법인 서식 대상이 아니다(`bs: null`). 개인사업자는 소득세법 표준재무제표용 매핑표를 따로 만든다.
+
+## 8. 회계 리뷰 반영 이력 (2026-09-06)
+
+리뷰 24건(회계 17 + ERPNext 역학 7)의 처리. "회계 정합성 > ERPNext 편의" 로 판단하되 ERPNext 동작은 깨지 않았다.
+
+| # | 심각도 | 조치 |
+|---|---|---|
+| 1 | blocker | 제조원가명세서·매출원가 산식 행을 `computed` 로 정의, 5110·5120·5140·5141 을 `reconcile_only` 로 강등, 항등식 3개 추가 |
+| 2 | high | 4180·4190 을 그룹으로 바꾸고 4181/4182 매출환입및에누리(제품/상품), 4191/4192 매출할인(제품/상품) 신설 → is 6/3 순액 |
+| 3 | high | 1159 를 그룹으로 바꾸고 1161~1164 재고자산평가충당금(상품/제품/원재료/재공품) 신설 → bs 45/46/51/48 순액. 5141 은 대사 전용 |
+| 4 | high | 5338 임원상여금(is 71), 5340 임원퇴직급여(is 75), 5225 임원급여(제)(mfg 7), 5226 임원퇴직급여(제)(mfg 13) 신설. 5304 → is 76 |
+| 5 | medium | 5252 기업업무추진비(제) → mfg 34 |
+| 6 | medium | 5341 연구비(is 94), 5253 연구비(제)(mfg 32) 신설 |
+| 7 | medium | **리뷰안(교차 매핑)과 다르게 처리** — 4270 을 Income 루트에 두고 판관비 행에 음수 배정하는 대신, 판관비 아래 5345 대손충당금환입(Expense 루트, 대변잔액) 을 신설해 is 96 순액 반영. ERPNext 자체 손익계산서에서도 영업이익이 맞는다. 4270 은 `기타대손충당금환입`(is 159) 으로 개명 |
+| 8 | medium | 미수수익·선급비용·선납세금을 1170 기타유동자산 하위 1173/1174/1176 으로 이동 (서식 (3)기타유동자산 구성과 일치) |
+| 9 | medium | `meta.aggregation` 규약 명시. 헤더 행 배정 15건을 리프 행으로 재배정(1262→176, 2122→254, 2172→273, 2233→319, 3130→335, 3520→374, 4140→9, 4150→15, 4260→155, 5304→76, 5312→89, 5313→82, 5322→105, 5332→122, 5450→204). 잔여 헤더 배정은 `level:parent`. 313 예외는 `aggregation_exceptions` |
+| 10 | medium | **리뷰안과 다르게 처리** — 5140 을 mfg 39 에 배정하면 원재료 감모가 재료비 산식과 이중계상되므로 `reconcile_only` 로 두고 타계정대체 행의 `except_counter` 에 넣어 기말재고 감소로만 반영. 5150 → mfg 3 직접 가산 |
+| 11 | low | **보류** — 1160 재고출고미청구는 원가 기준 자산이고 SDBNB 경로에서 매출원가 인식이 청구 시점이므로 채권이 아니다. 재고자산(bs 62) 유지 |
+| 12 | low | 1147 가지급금 → bs 27 주주ㆍ임원ㆍ직원 단기대여금 (미검증, note 에 39 재매핑 조건) |
+| 13 | low | 1171 → 부가세관련자산, 1901 → 기초잔액가계정. 5337·5482 는 결함 20 으로 삭제. 동명 5쌍은 결함 23 |
+| 14 | low | 3140 인출금 `bs: null`. 합병차익·지분법자본변동 등은 테넌트 추가로 남김 |
+| 15 | low | 1126 대손충당금(주주임원종업원단기대여금)(bs 28), 1218 감가상각누계액(투자부동산)(bs 97 순액), 1270~1273 상각누계액(영업권/산업재산권/개발비/소프트웨어)(bs 170/176/184/186 순액). 1217 에 Fixed Asset |
+| 16 | low | 5342 인적용역비(is 220), 5343 특허권사용료(is 118), 5344 수출제비용(is 119), 5255 특허권사용료(제)(mfg 30) |
+| 17 | low | 5254 보관료(제)(mfg 38), 5225 임원급여(제). 5238 무형자산상각비(제) → mfg 19 (별지 제20호 대사) |
+| 18 | high | 무형자산 6원장에 `Fixed Asset`, 상각누계액 4원장 신설, 무형자산 블록을 유형자산 앞으로 이동(§6.1) |
+| 19 | medium | 검증기 (11) 이 타입별 마지막/첫 원장을 단언. 이 문서 §6 에 사실 명시. **훅은 후속 과제**(§11-1) |
+| 20 | medium | 5482 `손실 처리`·5337 `은행 수수료` 삭제. `write_off_account`=5480 잡손실, `bank_charges_account`=5322 지급수수료는 훅이 지정 |
+| 21 | medium | 훅에서 `exchange_gain_account`=4250, `exchange_loss_account`=5420, `round_off_for_opening`=2174 지정 예정. **단일 손익 계정 2개는 사용자 결정 대기**(§9-3) |
+| 22 | medium | 제조 기본 유지(결정 4). 창고 계정 매핑은 훅 후속 과제(§11-2) |
+| 23 | low | 5510 → 당기법인세비용. 1179/1289/2179/2239 → `…(미분류)` |
+| 24 | low | **보류** — 선급금/선수금에 Payable/Receivable 타입을 붙이면 훅 없이는 `default_receivable_account` 가 선수금으로 바뀐다. 훅 배치 후 JSON 변경(§11-5) |
+
+## 9. 알려진 한계
+
+1. **자본 카테고리 2종.** `Account Category` 에 자본용은 `Share Capital`·`Reserves and Surplus` 뿐이라 IFRS 재무상태표 템플릿에서 자본잉여금·자본조정·기타포괄손익누계액·이익잉여금이 한 행으로 합산된다. 트리는 5분류를 유지하므로 한국식 재무상태표 리포트는 트리 기준으로 만든다.
+2. **이름 매칭 6항목**(§6.2)은 JSON 만으로 채울 수 없다. 앱 `ko.po` 에서 msgid 번역을 덮는 방식은 Sales Invoice 의 'Write Off' 섹션 등 UI 문자열까지 바뀌므로 쓰지 않는다.
+3. **단일 손익 계정 부재.** 차트는 외환차익(4250)/외환차손(5420), 유형자산처분이익(4260)/처분손실(5450) 으로 손익을 분리하는데 코어의 `exchange_gain_loss_account`([`payment_entry.py:1142-1150`](../../erpnext/accounts/doctype/payment_entry/payment_entry.py) — 없으면 환차 전기 누락)·`disposal_account`([`depreciation.py:614`](../../erpnext/assets/doctype/asset/depreciation.py)) 는 단일 계정을 요구한다. 선택지: (i) 영업외비용에 `5422 외환차손익`·`5452 유형자산처분손익` 을 추가하고 훅이 지정, 결산 시 이익분 재분류 / (ii) `4250`·`4260` 을 지정하고 손실 시 차변 잔액 감수. **결정되지 않았다.**
+4. **세금 템플릿 0건.** `country_wise_tax.json` 의 한국 키는 `"South Korea"` 인데 `Company.country` 는 `"Korea, Republic of"` 라 `taxes_setup.py:20-22` 가 즉시 return 한다. 부가세 10% 템플릿은 앱 훅이 만든다(§11-3). 포크의 `country_wise_tax.json` 수정은 3단계 에스컬레이션 대상.
+5. **IFRS 현금흐름표 무형자산 행.** `standard_cash_flow_statement_(ifrs).json:426` 은 `account_category = Intangible Assets` 만 보고 유형자산 행(`:375`)과 달리 Accumulated Depreciation 제외 조건이 없어 상각 대변이 투자활동에 순액으로 섞인다. 상위 템플릿 한계 — 한국 현금흐름표 템플릿 과제.
+6. **서식 개정 대응.** `validate_coa.py` 가 `meta.*_revised` 와 `nts_codes.json` 의 `revised` 를 대조한다. 서식이 개정되면 PDF 재추출 → `nts_codes.json` 갱신 → 매핑 재검토 순서다. `is 220` 처럼 배열 끝에 코드가 붙으므로 items 는 읽기 순서이지 코드순이 아니다.
+7. **`Stores` → `백화점` 오역.** `erpnext/locale/ko.po:54110` 때문에 위저드 기본창고가 `백화점 - 약어` 로 생긴다(`Sales` → `매상` 도 같은 유형). 포크 `ko.po` 가 아니라 앱 `ko.po` 에서 재정의한다.
+8. **창고 계정 미매핑.** 위저드가 만드는 창고 5개는 `account` 가 비어 있어 창고 매핑 전에는 상품·제품 입출고도 전부 1155 원재료로 전기된다.
+9. **위저드 밖에서 Company 를 만들면** `Warehouse Type "Transit"` 이 없어 `LinkValidationError` 가 난다(`install_fixtures.py:316` 이 위저드에서만 실행). 실측 재현·확인.
+10. **통화.** 위저드 경로는 `account_currency` 를 무시하고 Company 기본통화(KRW)로 일괄 지정한다. 외화계좌는 테넌트가 통화를 지정해 원장을 추가한다.
+11. **`computed`·`reconciliation` 은 명세다.** 표준재무제표 리포트(실행기)는 미착수(§11-6).
+
+## 10. 검증
+
+저장소 루트(`setive-oss-erpnext-16.33`)에서 실행한다. 형제 폴더 배치는 KB-OPS-001 §1.1.
+
+```bash
+# 정적 검사 — 기대: "-- errors 0, warnings 0"
+python3 ../setive_erpnext_kr/scripts/coa/validate_coa.py \
+  erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json \
+  --map ../setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json \
+  --nts ../setive_erpnext_kr/scripts/coa/nts_codes.json
+
+# 재생성 — 결과가 현재 파일과 같아야 한다 (md5 비교)
+python3 ../setive_erpnext_kr/scripts/coa/build_kr_coa.py     # → verified/kr_standard_chart_of_accounts.json
+python3 ../setive_erpnext_kr/scripts/coa/build_nts_map.py    # → korea/common/data/nts_standard_code_map.json
+
+# 컨테이너: 드롭다운 목록 노출 — 기대: ["한국 표준 계정과목표 (일반기업회계기준)", "Standard", "Standard with Numbers"]
+COMPOSE=docker/development/docker-compose.yml
+docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
+  erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.get_charts_for_country \
+  --kwargs "{'country':'Korea, Republic of','with_standard':True}"
+
+# 컨테이너: 위저드 미리보기 트리 렌더 — 기대: nodes 321 expandable 52 dup 0
+docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
+  erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.build_tree_from_json \
+  --kwargs "{'chart_template':'한국 표준 계정과목표 (일반기업회계기준)'}" 2>/dev/null \
+  | python3 -c "import sys,json; r=sys.stdin.read(); d=json.loads(r[r.find('['):r.rfind(']')+1]); v=[x['value'] for x in d]; print('nodes',len(d),'expandable',sum(1 for x in d if x.get('expandable')),'dup',len(v)-len(set(v)))"
+```
+
+2026-09-06 실측: 정적 검사 errors 0 · warnings 0, 목록 3건 노출, 트리 321/52/0. Company 생성 실측은 리뷰 전 판(296계정)에서 수행했고(296 삽입, NestedSet 결함 0, 접미사 0, 카테고리 없는 원장 0, Error Log 증가 0), 확정본은 구조 변경이 커서(계정 +25, 그룹화 3, 블록 순서 1) **회사 재생성은 하지 않았다.** 다음 위저드 실행 또는 아래 절차로 재확인한다.
+
+```bash
+# Company 생성 실측(트랜잭션 후 삭제). 위저드 미완료 사이트에서는 Warehouse Type 'Transit' 이 먼저 있어야 한다 (§9-9)
+docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
+  frappe.client.get_count --kwargs "{'doctype':'Account','filters':{'company':'<회사명>'}}"   # 기대 321
+```
+
+## 11. 후속 과제
+
+| # | 과제 | 위치 | 비고 |
+|---|---|---|---|
+| 1 | **Company 훅** — `hooks.doc_events["Company"]["on_update"]` 에서 `account_number` 로 기본계정 고정: `default_receivable_account`=1131, `default_payable_account`=2111, `default_cash_account`=1111, `default_bank_account`=1115, `default_inventory_account`=1155, `default_expense_account`=5120, `default_income_account`=4111, `depreciation_expense_account`=5311, `accumulated_depreciation_account`=1243, `write_off_account`=5480, `bank_charges_account`=5322, `exchange_gain_account`=4250, `exchange_loss_account`=5420, `round_off_for_opening`=2174, `default_discount_account`=4191 | `setive_erpnext_kr/korea/common/` | `erpnext/hooks.py` 에 `Company` 키가 없어 경합 없음. 훅이 있으면 JSON 형제 순서 의존이 사라진다 |
+| 2 | 창고 계정 매핑 — `Stores`→1155 원재료, `Work In Progress`→1154 재공품, `Finished Goods`→1152 제품, `Goods In Transit`→1158 미착품 | 같은 훅 | 결함 22 |
+| 3 | 부가세 템플릿 — 매출 10%(2151 부가세예수금), 매입 10%(1172 부가세대급금), 영세·면세 | `after_insert` 훅 | §9-4. 계정은 번호로 찾는다 |
+| 4 | Company Custom Field — 사업자등록번호·법인등록번호·주업종코드(KB-KOR-001 로드맵 3) | `custom/company.json` (`export_customizations`, KB-OPS-001 §4.1) | `sync_on_migrate:True` 필수 |
+| 5 | 선급금 1144 `Payable`·선수금 2141 `Receivable` 타입 부여 + `default_advance_paid/received_account` 지정 | JSON + 훅 | **훅(1) 배치 이후에만.** 순서를 어기면 `default_receivable_account` 가 선수금이 된다 |
+| 6 | 표준재무제표 리포트 — `computed`/`reconciliation` 실행기, 전표 단위 상대계정 산출 | 앱 리포트 | 테스트 원장으로 항등식 검증 |
+| 7 | 앱 `ko.po` 에 `Stores`·`Sales` 재정의 | `setive_erpnext_kr/locale/ko.po` | KB-LOC-003 규약 |
+| 8 | 외환차손익·유형자산처분손익 단일 계정 결정 | 사용자 | §9-3 |
+| 9 | K-IFRS 적용 테넌트 대응 검토 | — | 결정 1 에 따라 별도 벌은 만들지 않음. 필요 시 카테고리 확장으로 대응 |
+
+## 12. 이전 서술 정정
+
+- 초판 프런트매터는 "확정본은 목록 노출·트리 렌더만 재확인"이라고 적었으나, 이후 확정본(321계정)으로 Company 생성·측정·삭제를 재수행했다. 실측값: Account 321(그룹 52·원장 269), 전부 KRW, 접미사 ` 1` 0건, 카테고리 없는 원장 0건, NestedSet 결함 0, Error Log 증가 0, `get_or_create_tax_group` → Asset `1171 부가세관련자산` / Liability `2150 예수금`, Company `default_*` 39개 중 19개 자동 매핑(수취 1131·지급 2111·현금 1111·은행 1115·단수차이 5490·매출원가 5120·매출 4111·재고 1155·재고조정 5140·입고미청구 2161·출고미청구 1160·감가상각누계액 1243·감가상각비 5311·건설중 1246·자산취득미청구 2163 + 코스트센터 3 + 기본창고). 삭제 후 잔여 0.
+
+- 런타임 실측 기록의 "296계정(그룹 49 + 원장 247)" 은 리뷰 반영 전 판이다. 확정본은 **321계정(그룹 52 + 원장 269)** 이며 Company 기본계정 21개 중 `write_off_account`·`bank_charges_account` 는 확정본에서 비게 된다(계정 삭제, 훅으로 이관).
+- 리뷰 전 매핑 규약 "매출원가·재료비는 영구재고 원장 잔액을 소계 행에 직접 배정" 은 폐기했다. 재료비는 재고에 흡수되어 이중계상되고 노무비·경비는 손익계산서에 도달하지 못했다(결함 1). 산식 행 `computed` 와 `reconcile_only` 로 대체.
+- 리뷰 전 매핑의 "차감계정은 서식의 괄호 행 코드에 대변잔액 그대로 배정" 은 `amount_convention` + `sign:-1` 로 형식화했다. 의미는 같다.
+- 리뷰안 중 채택하지 않은 것: 결함 7 의 교차 매핑(Income 계정 → 판관비 행 음수), 결함 10 의 5140 → mfg 39, 결함 11 의 1160 이동, 결함 3 의 리프 번호안(1160 을 유지하고 1161~1164 사용). 근거는 §8.

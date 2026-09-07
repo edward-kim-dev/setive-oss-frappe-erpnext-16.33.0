@@ -405,6 +405,7 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 | 12 | ~~이미지 frappe 태그 ↔ 포크 브랜치 정합 (§10-1)~~ | **결정됨** — 포크를 이미지와 같은 `v16.33.0` 태그에 고정(2026-09-06 리베이스). 규약은 [`CLAUDE.md`](../../CLAUDE.md) "개발 환경 · 브랜치 규약" | — |
 | 13 | 기본 입고 창고 (§5) | 없음 — 16.33 에 `Company.default_warehouse` 필드가 없다 | `Stock Settings.default_warehouse` 전역 지정 / Item Default 경로 / 지정하지 않음 |
 | 14 | `company_defaults.DEFAULTS` 의 16.33 부재 필드 3개 (§4.1) | 그대로 씀 — 신규 16.33 사이트에서 1054 로 회사 생성 실패 | 세 항목 제거 + `meta.has_field` 필터로 `skipped` 처리 |
+| 15 | 창고→계정 매핑의 업종 분기 (§5) | 제조업 고정(Stores→1155·WIP→1154·FG→1152·Transit→1158). **2026-09-08 결정: 초기 타깃이 제조업이라 보류** | 상품매매는 창고 4개→1151 + `default_inventory/expense/income/discount_account` 한 세트를 바꿔야 하며(레시피는 앱 `scripts/nts/fixture_company.py` `configure_trading`), 대안으로 코어 `Company.enable_item_wise_inventory_account`(회사 생성 시점에만 전환 가능). 분기 신호(KSIC) 는 Company 에 저장되지 않아 Custom Field 가 선행. 근거·실측은 [KB-KOR-004 §8-3](./KB-KOR-004_nts_financial_statements.md) |
 
 ---
 

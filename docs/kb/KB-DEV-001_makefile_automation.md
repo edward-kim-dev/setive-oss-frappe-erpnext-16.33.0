@@ -51,3 +51,4 @@ EXEC_BACKEND = docker compose -f $(COMPOSE_FILE) exec backend
 - "소요 시간" 컬럼(`~0.2초` 등)을 제거했습니다. 호스트 성능·캐시 상태에 따라 달라지는 값이라 명세로 쓸 수 없습니다.
 - 절대경로 링크를 상대경로로 교체했습니다.
 - **2026-09-07: `make lang` 의 실행 경로가 바뀌었습니다.** `erpnext.setup.install.configure_target_languages` → `setive_erpnext_kr.korea.common.system_defaults.configure_target_languages`. 해당 코드가 포크에서 앱으로 이관됐기 때문입니다(KB-LOC-001 정정 참조).
+- **2026-09-07: 개발 스택 포트가 8000 → 8002 로 바뀌었습니다.** 같은 머신의 다른 프로젝트가 8000 을 점유하면 `frontend` 컨테이너만 조용히 기동 실패하고 backend 는 정상이라, 브라우저가 남의 스택 응답(500)을 받는 진단하기 어려운 상태가 됩니다. 접속 주소는 `http://localhost:8002` 입니다.

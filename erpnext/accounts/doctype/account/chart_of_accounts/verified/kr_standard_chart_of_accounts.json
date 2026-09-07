@@ -165,7 +165,6 @@
           },
           "재고출고미청구": {
             "account_number": "1160",
-            "account_type": "Stock Delivered But Not Billed",
             "account_category": "Stock Assets"
           },
           "원재료": {

@@ -139,7 +139,10 @@ services:
       PROXY_READ_TIMEOUT: 120
       CLIENT_MAX_BODY_SIZE: 50m
     ports:
-      - "8000:8080"
+      # 8000 은 같은 머신의 다른 프로젝트(OwnGo 개발 스택)가 점유하는 경우가 있어
+      # 8002 를 쓴다. 포트가 겹치면 frontend 컨테이너만 조용히 기동 실패하고
+      # (backend 는 정상) 브라우저는 남의 스택 응답을 받으므로 진단이 어렵다.
+      - "8002:8080"
     volumes:
       - sites-data:/home/frappe/frappe-bench/sites
       - ../../:/home/frappe/frappe-bench/apps/erpnext

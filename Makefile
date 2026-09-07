@@ -21,7 +21,7 @@ po:
 # 지역 기본값 재적용 + 번역 컴파일 (컨테이너 재생성으로 MO 가 유실됐을 때 수동 복구용)
 lang:
 	@echo "🇰🇷 지역 기본값 적용 및 번역 컴파일 중..."
-	@$(EXEC_BACKEND) bench --site localhost execute erpnext.setup.install.configure_target_languages
+	@$(EXEC_BACKEND) bench --site localhost execute setive_erpnext_kr.korea.common.system_defaults.configure_target_languages
 	@$(MAKE) po
 
 # 캐시 초기화

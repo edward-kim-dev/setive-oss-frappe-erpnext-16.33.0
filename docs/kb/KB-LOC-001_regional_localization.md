@@ -7,7 +7,7 @@ applies_to:
   - erpnext@16.33.0
   - frappe@v16
 verified_on: 2026-09-02
-verified_by: erpnext/setup/install.py · hooks.py 소스 직접 확인
+verified_by: 앱 system_defaults.py 소스 확인 + 런타임 훅 등록·실행 검증 (2026-09-07)
 related: [KB-ARCH-001, KB-LOC-002]
 ---
 
@@ -25,30 +25,34 @@ related: [KB-ARCH-001, KB-LOC-002]
 ## 2. 구성
 
 ```
-[erpnext/hooks.py]
-   ├─ after_install = "erpnext.setup.install.after_install"
-   └─ after_migrate = "erpnext.setup.install.after_migrate"
+[setive_erpnext_kr/hooks.py]                       ← 앱. 포크 hooks.py 는 건드리지 않는다
+   ├─ after_install  = "setive_erpnext_kr.install.after_install"
+   └─ after_migrate  = "setive_erpnext_kr.install.after_migrate"
                 │
                 ▼
-[erpnext/setup/install.py]
-   ├─ after_install()  → configure_target_languages(force_defaults=True)   ← 무조건 기록
-   ├─ after_migrate()  → configure_target_languages()                      ← 비어 있을 때만
+[setive_erpnext_kr/install.py]
+   ├─ after_install() → _configure_system_defaults(on_install=True)
+   │                      force = not frappe.is_setup_complete()   ← 셋업 끝난 사이트는 보존
+   └─ after_migrate() → _configure_system_defaults(on_install=False)
+                │
+                ▼
+[setive_erpnext_kr/korea/common/system_defaults.py]
    └─ configure_target_languages(force_defaults=False)
-        ├─ Language.enabled 를 대상 5개 코드만 1로 UPDATE (frappe.qb + Case)
+        ├─ Language.enabled 를 TARGET_LANGUAGE_CODES 5개만 1로 UPDATE (frappe.qb + Case)
         └─ force_defaults 이거나 System Settings.language 가 비었을 때만
              System Settings {language, country, time_zone, currency} 기록
              + User "Administrator".language = "ko"
                 │
                 ▼
-[erpnext/public/js/setup_wizard.js]
+[erpnext/public/js/setup_wizard.js]                ← 포크에 남는 유일한 부분
    └─ frappe.setup.utils.setup_language_field 래핑
         + frappe.setup.on("before_load") 에서 welcome 슬라이드 language 기본값 주입
 ```
 
 관련 파일:
 
-- [`erpnext/setup/install.py`](../../erpnext/setup/install.py) — `configure_target_languages()`, `after_migrate()`
-- [`erpnext/hooks.py`](../../erpnext/hooks.py) — `after_install`, `after_migrate`
+- `setive_erpnext_kr/korea/common/system_defaults.py` (형제 앱 저장소) — `configure_target_languages()`
+- `setive_erpnext_kr/install.py` (형제 앱 저장소) — `after_install`, `after_migrate` 와 force 게이트
 - [`erpnext/public/js/setup_wizard.js`](../../erpnext/public/js/setup_wizard.js) — 위저드 언어 필드 보정
 
 ## 3. 위저드 언어 필드 보정
@@ -124,3 +128,8 @@ make lang
 | "한국어가 100% Default로 주입되도록 보장", "두 가지 상충 요소를 완벽히 해결" | 검증 가능한 서술로 대체 (§1, §3.3) |
 
 이전 판의 절대경로 링크(`file:///Users/...`)도 상대경로로 교체했습니다.
+
+## 이전 서술 정정
+
+- **2026-09-07: 구현 위치가 포크 → 앱으로 옮겨졌습니다.** 이전 판은 `erpnext/setup/install.py` 의 `configure_target_languages()` 와 `erpnext/hooks.py` 의 `after_migrate` 한 줄을 전제로 서술했습니다. 그 구성은 upstream 태그 리베이스마다 `hooks.py`(연 55커밋) 충돌원이 되어, 같은 코드를 `setive_erpnext_kr/korea/common/system_defaults.py` 로 옮기고 두 코어 파일을 v16.33.0 원본으로 복원했습니다. 함수 본문은 동일하며 frappe API 만 사용합니다.
+- **`after_install` 의 force 조건이 달라졌습니다.** 이전에는 설치 시 무조건 `force_defaults=True` 였습니다. 앱은 `force = not frappe.is_setup_complete()` 로 게이트합니다 — 운영 중인 사이트에 앱을 나중에 설치할 때(KB-OPS-001 §3a) 운영자가 위저드에서 고른 언어·국가·통화·타임존을 덮어쓰지 않기 위한 것입니다. 신규 사이트에서는 `is_setup_complete()` 가 거짓이라 동작이 이전과 같습니다.

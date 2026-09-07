@@ -7,7 +7,6 @@ import os
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from frappe.desk.page.setup_wizard.setup_wizard import add_all_roles_to
-from frappe.query_builder import Case
 
 from erpnext.setup.doctype.incoterm.incoterm import create_incoterms
 from erpnext.setup.utils import identity as _
@@ -41,41 +40,6 @@ def after_install():
 	set_default_print_formats()
 	create_letter_head()
 	toggle_hidden_fields()
-	configure_target_languages(force_defaults=True)
-	frappe.db.commit()
-
-
-def configure_target_languages(force_defaults: bool = False):
-	"""Enable only the languages SETIVE ships with, and apply Korean regional defaults.
-
-	Regional defaults are written on install (`force_defaults`) or when System Settings
-	still has no language, so an operator's later choice is never overwritten.
-	"""
-	target_language_codes = ["en", "ko", "ja", "zh", "zh-TW"]
-	language = frappe.qb.DocType("Language")
-	(
-		frappe.qb.update(language)
-		.set(language.enabled, Case().when(language.language_code.isin(target_language_codes), 1).else_(0))
-		.run()
-	)
-
-	if not force_defaults and frappe.db.get_single_value("System Settings", "language"):
-		return
-
-	frappe.db.set_single_value(
-		"System Settings",
-		{
-			"language": "ko",
-			"country": "Korea, Republic of",
-			"time_zone": "Asia/Seoul",
-			"currency": "KRW",
-		},
-	)
-	frappe.db.set_value("User", "Administrator", "language", "ko")
-
-
-def after_migrate():
-	configure_target_languages()
 	frappe.db.commit()
 
 

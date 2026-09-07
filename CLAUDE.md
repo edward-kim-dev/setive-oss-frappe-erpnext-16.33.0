@@ -92,9 +92,7 @@ permission_query_conditions / has_permission / regional_overrides
 ### `erpnext/hooks.py` 를 수정하지 않는다
 upstream 최근 1년 커밋 **55회**. 리베이스 충돌의 주범이다. 훅이 필요하면 앱의 `hooks.py` 에 쓴다. Frappe 가 앱별 hooks 를 병합한다.
 
-> ⚠️ **현재 이 규칙을 어기는 코드가 남아 있다 (미결).** `erpnext/hooks.py:67` 의 `after_migrate` 1줄과 `erpnext/setup/install.py` 의 `configure_target_languages` 36줄은 앱이 없던 시절 커밋(`0dd24bc04c`)의 산물이다.
-> 이 코드는 frappe API 만 쓰고 erpnext 내부 심볼 의존이 0건이라 **앱 이관이 기술적으로 가능함이 확인됐다** — `setive_erpnext_kr/korea/common/system_defaults.py` 로 옮기고 앱 `install.py` 의 `after_install`/`after_migrate` 에서 호출한 뒤 두 코어 파일을 v16.33.0 원본으로 복원한다. 이관 시 `after_install` 은 `force_defaults=not frappe.is_setup_complete()` 로 게이트해야 한다(원본의 무조건 force 를 그대로 옮기면 기존 사이트에 앱을 나중 설치할 때 운영자가 고른 언어·국가·통화·타임존을 덮어쓴다). `Makefile` 의 `lang` 타깃 경로와 KB-LOC-001 §2 · KB-DEV-001 §3 도 함께 고쳐야 한다.
-> **사람 승인 사항이다.** 이 잔존 코드를 "선례" 로 삼아 코어를 더 고치지 않는다.
+> 2026-09-07 기준 포크가 수정하는 upstream 파일은 `erpnext/public/js/setup_wizard.js` · `erpnext/setup/setup_wizard/setup_wizard.py` · `erpnext/locale/main.pot` 뿐이다. 과거 `erpnext/hooks.py` 와 `erpnext/setup/install.py` 를 고쳤던 코드(커밋 `0dd24bc04c`)는 앱 `korea/common/system_defaults.py` 로 이관하고 두 파일을 v16.33.0 원본으로 복원했다.
 
 ### `erpnext/regional/korea/` 를 만들지 않는다
 `erpnext/regional/` 에 italy·uae·australia 가 실재하지만 이는 **upstream 패턴**이다. 한국은 동작하지 않는다 — `frappe.scrub("Korea, Republic of")` 가 `korea,_republic_of` 를 만들어 쉼표 때문에 파이썬 import 가 불가능하고, **그 예외를 프레임워크가 조용히 삼킨다**. 무증상 실패다.

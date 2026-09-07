@@ -247,3 +247,18 @@ $EXEC bench --site $SITE execute frappe.translate.get_all_translations \
 - **초판 §2.4 "frappe 코어 문자열은 포크 `ko.po` 맨 끝 비정렬 블록에 둔다"도 함께 철회합니다.** `erpnext/hooks.py` 의 `ignore_translatable_strings_from = ["frappe"]` 때문에 frappe 문자열이 erpnext `main.pot` 에 추출되지 않는다는 근거 자체는 지금도 맞지만, 결론은 "포크 파일 끝"이 아니라 "앱 `ko.po`"입니다. 앱 파일은 Crowdin·CI 재생성 대상이 아니라 위치 제약이 없습니다.
 - **초판 §5 의 "`erpnext/translations/ko.csv` 로 옮기는 대안"은 더 이상 검토 대상이 아닙니다.** 앱 `ko.po` 가 같은 목적(Crowdin 비관리 경로)을 달성하면서 MO 로딩 순서 문제도 없습니다. CSV 는 로드 순서가 `csv` → `mo` 라 같은 키가 PO 에 있으면 무시됩니다(KB-LOC-002 §2).
 - 초판은 이 문서를 "포크 로컬 번역" 규약으로 불렀습니다. 제목을 바꿨으나 파일명과 ID(`KB-LOC-003`)는 링크 정합을 위해 유지합니다.
+
+## frappe 코어 메시지 번역
+
+frappe 는 한국어 번역률이 매우 낮습니다(2026-09-07 기준 사이트 전체 ko 키 5,705건 중 frappe 몫은 소수). 결과적으로 위저드·문서 저장에서 **영문 메시지와 한국어 라벨이 섞여** 나옵니다.
+
+```
+통화 기호 숨기기 cannot be "0". It should be one of "", "No", "Yes"
+   └ 라벨만 번역됨          └ frappe 코어 메시지 msgid 가 미번역
+```
+
+원본은 [`frappe/model/base_document.py`](https://github.com/frappe/frappe) 의 `_('{0} {1} cannot be "{2}". It should be one of "{3}"')` 입니다. frappe 는 우리 포크가 아니므로 **앱 `locale/ko.po` 에 msgid 를 그대로 넣어 덮습니다** — 설치 앱 순회에서 나중 앱이 이기는 성질을 그대로 씁니다.
+
+2026-09-07 에 위저드·문서 저장 경로에서 사용자가 실제로 마주치는 25건을 추가했습니다(검증 실패·필수 항목 누락·제출 후 수정 금지 등).
+
+**주의**: 단독 `"Yes"`/`"No"` msgid 는 아직 번역하지 않았습니다. 전 UI 의 모든 Yes/No 를 바꾸는 광범위한 오버라이드이고, Select 옵션 표시와 확인 대화상자 등 영향 범위가 넓어 별도 판단이 필요합니다. 위 오류 메시지에서 옵션이 `"", "No", "Yes"` 로 영문으로 보이는 이유입니다.

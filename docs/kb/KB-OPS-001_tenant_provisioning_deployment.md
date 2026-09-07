@@ -643,6 +643,18 @@ $EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.
 - **초판에는 포크 브랜치와 이미지 태그의 정합 규칙이 없었습니다.** 2026-09-06 에 포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있고 이미지는 frappe 16.31.0 인 상태로 운영돼, 17-dev 가 30파일 65곳에서 부르는 `Meta.get_translated_label` 이 없어 매입·매출 전표 경로가 깨졌습니다. 기동·로그인은 정상이라 탐지되지 않았습니다. §1.7 을 신설했습니다 (2026-09-07).
 - **버전 판정에 `get_installed_apps_info`(About 대화상자)를 쓰면 안 됩니다.** 브랜치명이 `develop` 이면 `erpnext/hooks.py` 의 상수 `develop_version = "15.x.x-develop"` 이 표시됩니다. 실측에서 erpnext 16.33.0 이 `15.x.x-develop (6eb555d)` 으로 보고됐습니다 (§1.7).
 - §5.1 초판은 `install-app` → `migrate` 만으로 배포가 끝나는 것처럼 읽혔습니다. 앱의 Company 훅은 회사 저장 시에만 실행되므로 **앱 설치 전에 만든 회사에는 한국화 기본값이 적용되지 않습니다.** 3a 단계(`backfill`)를 추가했습니다 (2026-09-06, KB-KOR-003 §8 실측).
+- **2026-09-07: 태그 롤백은 필드 *타입*이 바뀐 자리에 옛 값을 남깁니다.** 셋업 위저드가 다음으로 실패했습니다.
+
+  ```
+  통화 기호 숨기기에는 "0" 를 지정할 수 없습니다. "", "No", "Yes" 중 하나여야 합니다
+  ```
+
+  `Global Defaults.hide_currency_symbol` 은 17-dev 에서 **Check**(기본값 `"0"`), 16.33.0 에서는 **Select**(`""`/`No`/`Yes`) 입니다. DB 에 남은 `"0"` 이 Select 검증에 걸리는데, 위저드의 `set_global_defaults()` 는 이 필드를 건드리지 않고 `global_defaults.save()` 가 **전 필드를 검증**하기 때문에 다른 값을 저장하려다 실패합니다([`erpnext/setup/setup_wizard/operations/install_fixtures.py:517-533`](../../erpnext/setup/setup_wizard/operations/install_fixtures.py)).
+
+  복구: `UPDATE tabSingles SET value='No' WHERE doctype='Global Defaults' AND field='hide_currency_symbol'` 후 `frappe.db.set_default('hide_currency_symbol','No')` · `frappe.clear_cache()`.
+
+  **태그를 되돌린 뒤에는 Select 필드 전수 점검을 하십시오.** 저장된 값이 현재 옵션 목록에 없는 것을 찾는 방식입니다(아래 §9 검증 참조). 2026-09-07 실측에서는 이 1건만 나왔습니다.
+
 - **2026-09-07: 태그 롤백(17-dev → v16.33.0) 시 패치 로그 때문에 누락되는 것이 있습니다.** ERPNext 는 설치 시 `create_address_and_contact_custom_fields()` 로 `Contact.is_billing_contact` 등 Custom Field 를 만들고, 누락분은 패치 `v16_0/migrate_address_contact_custom_fields` 가 보충합니다. 그런데 17-dev 이력에는 그 패치가 **이미 실행됨으로 기록**돼 있어 `bench migrate` 가 건너뜁니다. 결과적으로 컬럼이 없는 채로 남아 매입/매출 전표가 `OperationalError (1054, "Unknown column 'tabContact.is_billing_contact'")` 로 실패합니다.
   복구: `bench --site <site> execute erpnext.setup.install.create_address_and_contact_custom_fields`. 태그를 되돌린 뒤에는 **erpnext 가 설치 시 만드는 Custom Field 가 전부 있는지** 확인해야 합니다(패치 로그는 앞선 버전 것을 그대로 갖고 있습니다).
 - **개발 스택 접속 포트는 8002 입니다**(8000 은 같은 머신의 다른 프로젝트와 충돌). `docker/development/docker-compose.yml` 의 `frontend.ports` 참조.

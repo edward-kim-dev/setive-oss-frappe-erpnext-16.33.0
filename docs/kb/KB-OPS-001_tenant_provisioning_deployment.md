@@ -86,9 +86,9 @@ ls -1 apps > sites/apps.txt;
 
 마운트를 추가하고 스택을 재기동하면 앱이 자동 등재됩니다. 실측으로 확인했습니다.
 
-### 1.4 앱은 bench 가상환경에 pip 설치돼야 한다 ★
+### 1.4 앱을 파이썬이 찾게 하는 두 가지 방법 ★
 
-**마운트만으로는 동작하지 않습니다.** 앱이 파이썬 패키지로 설치돼 있어야 `bench`가 import할 수 있습니다.
+**마운트만으로는 동작하지 않습니다.** 앱이 import 가능해야 `bench` 가 쓸 수 있습니다.
 
 컨테이너에는 파이썬이 **두 개** 있습니다.
 
@@ -97,19 +97,35 @@ ls -1 apps > sites/apps.txt;
 | `/usr/local/bin/python` | 시스템 파이썬. `bench` 실행파일 자체 |
 | `/home/frappe/frappe-bench/env/bin/python` | **bench 가상환경. 사이트 명령이 실제로 쓰는 것** |
 
-`pip install`을 시스템 파이썬에 하면 `python -c "import setive_erpnext_kr"`은 성공하지만 `bench --site ... install-app`은 `ModuleNotFoundError`로 실패합니다. 실측으로 재현했습니다.
+#### (a) 개발 — `PYTHONPATH` (권장)
+
+`pip install -e` 는 `.pth` 를 `env/lib/.../site-packages` 에 남기는데, 그 경로는 **볼륨이 아니라 컨테이너 레이어**라 `docker compose down` → `up` 이나 compose 변경에 따른 재생성마다 사라집니다. 그러면 사이트 전체가 `ModuleNotFoundError` 로 HTTP 500 이 됩니다.
+
+[`docker-compose.yml`](../../docker/development/docker-compose.yml) 이 앱 디렉터리를 `PYTHONPATH` 에 얹어 이를 우회합니다.
+
+```yaml
+environment:
+  PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
+```
+
+> ⚠️ **YAML 병합키(`<<:`)는 매핑을 깊게 합치지 않습니다.** 서비스가 자기 `environment:` 블록을 가지면 앵커의 `environment` 는 **통째로 무시**됩니다. `backend` 가 `GUNICORN_THREADS` 때문에 자체 블록을 갖고 있어, 앵커와 `backend` **양쪽에** 선언해야 합니다. 실측으로 확인된 함정입니다.
+
+확인: `docker compose ... config | grep -c PYTHONPATH` 가 파이썬 실행 서비스 수와 맞아야 합니다.
+
+#### (b) 운영 — 커스텀 이미지
+
+운영 테넌트는 앱을 포함한 이미지를 빌드하는 것이 정석입니다(frappe_docker layered build). `PYTHONPATH` 는 pip 메타데이터가 없어 `bench list-apps` 의 버전 표기가 부정확해질 수 있습니다(기능에는 영향 없음).
+
+#### 수동 pip 설치 (필요 시)
 
 ```bash
-# 파이썬 코드를 로드하는 컨테이너 전부에 설치
 for SVC in backend queue-short queue-long scheduler; do
   docker compose -f "$COMPOSE" exec -T "$SVC" \
     /home/frappe/frappe-bench/env/bin/pip install -q -e apps/setive_erpnext_kr
 done
 ```
 
-**이 설치는 컨테이너 레이어에 기록되므로 컨테이너를 재생성하면 소실됩니다.** `apps/`는 바인드 마운트라 소스는 남지만 `site-packages`의 링크는 사라집니다.
-
-→ 운영 환경에서는 매번 pip 설치를 반복하는 대신 **앱을 포함한 커스텀 이미지를 빌드**하는 것이 정석입니다(frappe_docker의 layered build). 개발 환경에서는 컨테이너 재생성 시마다 위 명령을 반복해야 합니다.
+시스템 파이썬(`/usr/local/bin/pip`)에 설치하면 `python -c "import ..."` 는 되지만 `bench` 는 못 찾습니다. 실측으로 재현했습니다.
 
 ### 1.5 앱 이름 규칙
 
@@ -658,3 +674,5 @@ $EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.
 - **2026-09-07: 태그 롤백(17-dev → v16.33.0) 시 패치 로그 때문에 누락되는 것이 있습니다.** ERPNext 는 설치 시 `create_address_and_contact_custom_fields()` 로 `Contact.is_billing_contact` 등 Custom Field 를 만들고, 누락분은 패치 `v16_0/migrate_address_contact_custom_fields` 가 보충합니다. 그런데 17-dev 이력에는 그 패치가 **이미 실행됨으로 기록**돼 있어 `bench migrate` 가 건너뜁니다. 결과적으로 컬럼이 없는 채로 남아 매입/매출 전표가 `OperationalError (1054, "Unknown column 'tabContact.is_billing_contact'")` 로 실패합니다.
   복구: `bench --site <site> execute erpnext.setup.install.create_address_and_contact_custom_fields`. 태그를 되돌린 뒤에는 **erpnext 가 설치 시 만드는 Custom Field 가 전부 있는지** 확인해야 합니다(패치 로그는 앞선 버전 것을 그대로 갖고 있습니다).
 - **개발 스택 접속 포트는 8002 입니다**(8000 은 같은 머신의 다른 프로젝트와 충돌). `docker/development/docker-compose.yml` 의 `frontend.ports` 참조.
+- **2026-09-07: 앱 로딩 방식을 `PYTHONPATH` 로 바꿨습니다(§1.4).** 초판은 `env/bin/pip install -e` 를 유일한 방법으로 서술했으나, 그 설치는 컨테이너 레이어에 남아 `docker compose down` → `up` 마다 사라집니다. IDE 실행 구성이 `down`/`up` 을 제공하므로 실사용에서 반드시 재현되는 문제였습니다. 검증: pip 패키지를 제거한 상태로 전체 `down` → `up` 후 import·훅 등록·사이트 200 확인.
+- **`backend` 재생성 후 `frontend` 가 502 를 내면** nginx 가 옛 upstream IP 를 물고 있는 것입니다(§5.3). 전체 `down`/`up` 은 함께 재생성되어 문제가 없고, 일부 서비스만 재생성했을 때 발생합니다.

@@ -11,6 +11,10 @@ x-depends-on-configurator: &depends_on_configurator
 
 x-backend-defaults: &backend_defaults
   <<: [*depends_on_configurator, *customizable_image]
+  # 자체 environment 블록이 없는 서비스(queue-*, scheduler, websocket)용.
+  # backend 는 자체 블록이 있어 이 값이 무시되므로 거기에도 같은 줄을 직접 넣었다.
+  environment:
+    PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
   volumes:
     - sites-data:/home/frappe/frappe-bench/sites
     # sites/assets 는 컨테이너 레이어(/home/frappe/frappe-bench/assets)를 가리키는 심볼릭
@@ -120,6 +124,12 @@ services:
     <<: *backend_defaults
     container_name: setive-backend
     environment:
+      # setive_erpnext_kr 는 바인드 마운트지만 pip editable 설치 기록(.pth)은
+      # env/lib/.../site-packages(컨테이너 레이어)에 남아 재생성마다 사라진다.
+      # 앱 디렉터리를 PYTHONPATH 에 얹어 재생성에도 import 가 유지되게 한다.
+      # ⚠ YAML 병합키는 매핑을 깊게 합치지 않는다 — 서비스가 자체 environment 를
+      #   가지면 앵커의 environment 는 통째로 무시되므로 서비스마다 직접 넣는다.
+      PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
       GUNICORN_THREADS: 4
       GUNICORN_WORKERS: 2
       GUNICORN_TIMEOUT: 120

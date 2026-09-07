@@ -28,6 +28,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-KOR-002](./kb/KB-KOR-002_korean_chart_of_accounts.md) | 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑 | 한국화 |
 | [KB-KOR-003](./kb/KB-KOR-003_company_hook_tax_nts.md) | Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정 | 한국화 |
 | [KB-OPS-001](./kb/KB-OPS-001_tenant_provisioning_deployment.md) | 테넌트 프로비저닝·배포 파이프라인 (SETIVE Backend 참조) | 운영·배포 |
+| [KB-KOR-004](./kb/KB-KOR-004_nts_financial_statements.md) | 국세청 표준재무제표 리포트 (표준재무상태표·표준손익계산서·제조원가명세서) | 한국화 |
 
 ### ONT — 온톨로지 입력물
 

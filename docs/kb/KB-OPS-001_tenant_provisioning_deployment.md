@@ -108,7 +108,12 @@ environment:
   PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
 ```
 
-> ⚠️ **YAML 병합키(`<<:`)는 매핑을 깊게 합치지 않습니다.** 서비스가 자기 `environment:` 블록을 가지면 앵커의 `environment` 는 **통째로 무시**됩니다. `backend` 가 `GUNICORN_THREADS` 때문에 자체 블록을 갖고 있어, 앵커와 `backend` **양쪽에** 선언해야 합니다. 실측으로 확인된 함정입니다.
+> ⚠️ **선언 위치를 세 군데 다 챙겨야 합니다.** 실측으로 두 번 걸렸습니다.
+>
+> 1. **YAML 병합키(`<<:`)는 매핑을 깊게 합치지 않습니다.** 서비스가 자기 `environment:` 블록을 가지면 앵커의 `environment` 는 **통째로 무시**됩니다. `backend` 가 `GUNICORN_THREADS` 때문에 자체 블록을 갖고 있어 앵커와 `backend` 양쪽에 필요합니다.
+> 2. **`configurator` 는 `x-backend-defaults` 앵커를 쓰지 않습니다.** `*customizable_image` 를 직접 씁니다. 여기에 `PYTHONPATH` 가 없으면 `apps.txt` 에 있는 앱을 import 하지 못해 `frappe.init()` 의 `setup_module_map` 이 죽고, **`bench new-site` 를 포함한 모든 bench 명령**이 `ModuleNotFoundError` 로 실패합니다. 부트스트랩 전체가 무너집니다.
+
+확인: `docker compose ... config | awk '/^  [a-z-]+:$/{s=$1} /PYTHONPATH/{print s}' | sort -u` 가 파이썬 실행 서비스(backend·configurator·queue-short·queue-long·scheduler·websocket)를 모두 포함해야 합니다.
 
 확인: `docker compose ... config | grep -c PYTHONPATH` 가 파이썬 실행 서비스 수와 맞아야 합니다.
 
@@ -676,3 +681,8 @@ $EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.
 - **개발 스택 접속 포트는 8002 입니다**(8000 은 같은 머신의 다른 프로젝트와 충돌). `docker/development/docker-compose.yml` 의 `frontend.ports` 참조.
 - **2026-09-07: 앱 로딩 방식을 `PYTHONPATH` 로 바꿨습니다(§1.4).** 초판은 `env/bin/pip install -e` 를 유일한 방법으로 서술했으나, 그 설치는 컨테이너 레이어에 남아 `docker compose down` → `up` 마다 사라집니다. IDE 실행 구성이 `down`/`up` 을 제공하므로 실사용에서 반드시 재현되는 문제였습니다. 검증: pip 패키지를 제거한 상태로 전체 `down` → `up` 후 import·훅 등록·사이트 200 확인.
 - **`backend` 재생성 후 `frontend` 가 502 를 내면** nginx 가 옛 upstream IP 를 물고 있는 것입니다(§5.3). 전체 `down`/`up` 은 함께 재생성되어 문제가 없고, 일부 서비스만 재생성했을 때 발생합니다.
+- **2026-09-07: 부트스트랩이 앱을 자동 설치하고 번역 MO 를 검증하도록 했습니다.** 신규 사이트(볼륨 초기화 후 첫 기동)에서 세 가지가 연달아 문제였습니다.
+  1. `configurator` 에 `PYTHONPATH` 가 없어 모든 bench 명령이 실패 → §1.4 의 경고 2 참조.
+  2. 엔트리포인트가 앱으로 이관된 `configure_target_languages` 를 옛 경로(`erpnext.setup.install...`)로 호출 → 앱 경로로 정정. **코드를 이관할 때 compose 엔트리포인트도 함께 고쳐야 합니다**(Makefile 만 고쳤다가 놓쳤습니다).
+  3. 신규 사이트에는 앱이 설치돼 있지 않음 → `list-apps | grep -q` 로 확인 후 `install-app` 하는 단계 추가(멱등).
+- **`compile_translations` 는 `sites/assets` 심볼릭이 있어야 볼륨에 씁니다.** 신규 부트스트랩에서는 그 심볼릭이 아직 없어 MO 가 `sites` 볼륨 안 실제 디렉터리에 쓰이고, 나중에 심볼릭이 생기면서 가려집니다. 로그는 "MO file created" 로 성공을 보고하는데 번역은 적용되지 않는 **조용한 실패**입니다. 엔트리포인트에서 컴파일 전에 `ln -sfn` 으로 심볼릭을 보장하고, 컴파일 후 MO 존재를 확인해 경고를 남깁니다.

@@ -71,6 +71,11 @@ services:
   configurator:
     <<: *customizable_image
     container_name: setive-configurator
+    environment:
+      # ⚠ configurator 는 x-backend-defaults 앵커가 아니라 customizable_image 를 쓴다.
+      #   여기에 PYTHONPATH 가 없으면 apps.txt 에 있는 앱을 import 하지 못해
+      #   bench new-site 를 포함한 **모든 bench 명령**이 ModuleNotFoundError 로 실패한다.
+      PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
     volumes:
       - sites-data:/home/frappe/frappe-bench/sites
       - locale-data:/home/frappe/frappe-bench/assets/locale
@@ -106,10 +111,26 @@ services:
         else
           echo "Site localhost already exists."
         fi
+        if ! bench --site localhost list-apps | grep -q setive_erpnext_kr; then
+          echo "Installing setive_erpnext_kr...";
+          bench --site localhost install-app setive_erpnext_kr;
+        fi
         echo "Applying regional defaults and compiling ko translations...";
-        bench --site localhost execute erpnext.setup.install.configure_target_languages;
+        bench --site localhost execute setive_erpnext_kr.korea.common.system_defaults.configure_target_languages;
+        # compile_translations 는 sites/assets/locale/... 에 MO 를 쓴다. sites/assets 는
+        # /home/frappe/frappe-bench/assets(= locale-data 볼륨) 를 가리키는 심볼릭인데,
+        # 신규 사이트 부트스트랩에서는 이 심볼릭이 아직 없을 수 있다. 그러면 MO 가
+        # sites 볼륨 안의 실제 디렉터리에 쓰이고, 나중에 심볼릭이 생기면서 가려져
+        # 번역이 조용히 적용되지 않는다. 컴파일 전에 심볼릭을 보장한다.
+        ln -sfn /home/frappe/frappe-bench/assets /home/frappe/frappe-bench/sites/assets;
         bench --site localhost execute frappe.gettext.translate.compile_translations --kwargs "{'locale': 'ko', 'force': True}";
         bench --site localhost clear-cache;
+        # 앱 MO 가 실제로 볼륨에 떨어졌는지 확인 (조용한 실패 방지)
+        if [ -f /home/frappe/frappe-bench/assets/locale/ko/LC_MESSAGES/setive_erpnext_kr.mo ]; then
+          echo "ko translations OK (setive_erpnext_kr.mo present).";
+        else
+          echo "WARNING: setive_erpnext_kr.mo missing — run 'make po' after startup.";
+        fi;
         echo "Bootstrap complete.";
     depends_on:
       mariadb:

@@ -115,18 +115,33 @@ apply_all(company)
 
 `account_type` 매칭으로 코어 `Company.set_default_accounts`([`company.py`](../../erpnext/setup/doctype/company/company.py)) 가 채우는 것: 수취 1131 · 지급 2111 · 현금 1111 · 은행 1115 · 단수차이 5490 · 매출원가 5120 · 매출 4111 · 재고 1155 · 재고조정 5140 · 입고미청구 2161 · 출고미청구 1160 · 감가상각누계액 1243 · 감가상각비 5311 · 건설중 1246 · 자산취득미청구 2163 · 기초잔액단수차이 2174, 그리고 코스트센터 3(`기본 - 약어`). 17-dev 에서 실측한 값이며 `default_warehouse` 는 16.33 Company 에 필드가 없어 목록에서 뺐다(§12).
 
-훅은 이 필드들에 개입하지 않는다. 따라서 **같은 타입 원장이 여럿일 때 JSON 형제 순서가 기본계정을 정한다는 규칙(KB-KOR-002 §6.1)은 그대로 유효하다.** KB-KOR-002 §11-1 초판은 "훅이 있으면 형제 순서 의존이 사라진다"고 적었으나 그 범위로는 구현하지 않았다 — 빈 필드만 채우는 멱등 규칙과 양립하지 않기 때문이다.
+훅은 이 필드들에 개입하지 않는다 — **단 하나의 예외**가 2026-09-08 에 생겼다: 업종 프로필(§4.4)이 방금 바뀐 저장에서는 재고·매출원가·매출·매출할인 4개 필드를 프로필 표준값으로 바꾼다(코어가 채운 표준값일 때만). 그 밖의 저장에서는 이전과 같이 개입하지 않는다. 따라서 **같은 타입 원장이 여럿일 때 JSON 형제 순서가 기본계정을 정한다는 규칙(KB-KOR-002 §6.1)은 그대로 유효하다.** KB-KOR-002 §11-1 초판은 "훅이 있으면 형제 순서 의존이 사라진다"고 적었으나 그 범위로는 구현하지 않았다 — 빈 필드만 채우는 멱등 규칙과 양립하지 않기 때문이다.
+
+### 4.4 업종 프로필 필드 (`industry.py`)
+
+Company Custom Field `setive_industry_profile`(Select `manufacturing` 기본 / `trading`, §7.1)이 아래 4개 필드와 창고 계정(§5)을 정한다.
+
+| 필드 | manufacturing | trading |
+|---|---|---|
+| `default_inventory_account` | 1155 원재료 | 1151 상품 |
+| `default_expense_account` | 5120 제품매출원가 | 5110 상품매출원가 |
+| `default_income_account` | 4111 국내제품매출 | 4121 국내상품매출 |
+| `default_discount_account` | 4191 제품매출할인 (DEFAULTS 가 채움) | 4192 상품매출할인 |
+
+코어 `set_default_accounts` 가 회사 생성 시 앞의 셋을 먼저 채우므로 §3.3 의 '빈 값만' 규칙으로는 못 바꾼다. `industry.decide` 의 **전환 규칙**이 그 틈을 메운다: 값이 비어 있으면 채우고, 현재 값이 다른 프로필의 표준값이면 `switch=True` 일 때만 바꾸며(코어·이전 프로필이 자동으로 채운 값), 그 밖의 값은 사용자가 고른 것으로 보고 `skipped` 로 남긴다. `switch` 는 `Company.on_update` 에서 `doc.has_value_changed("setive_industry_profile")` 가 참일 때(신규 생성 포함)와 `backfill` 에서만 참이다 — 제조 회사가 매출원가를 5110 으로 골라 둔 것을 훅이 무관한 저장마다 되돌리면 안 되기 때문이다. 프로필이 바뀐 저장에서는 `nts_codes.apply(reseed_overlay=True)` 도 함께 돌아 매핑표 `profile_overrides`(trading: 5150 → is 38)가 계정에 반영된다 — 오버레이 대상 번호도 현재 값이 어느 프로필의 표준값일 때만 다시 쓰고, 테넌트가 손으로 고친 값은 `kept` 로 남긴다(§7.2). 전환 결과 중 건너뛴 항목(창고 미발견·재고 원장 보호·사용자 계정 유지)은 폼에 주황색 알림으로 보인다.
 
 ## 5. 창고 (`warehouses.py`)
 
 코어 `Company.create_default_warehouses`([`company.py`](../../erpnext/setup/doctype/company/company.py)) 는 `All Warehouses` 그룹 아래 창고 4개를 만들 뿐 **어떤 Company 필드도 채우지 않는다.** 창고 `account` 와 Company 창고 필드 3개는 비어 있다.
 
-| role | 코어 영문명 → 표시명 | `account` | Company 필드 |
-|---|---|---|---|
-| stores | Stores → `창고`(앱 ko.po) / `백화점`(포크 ko.po, 앱 교정 전) | 1155 원재료 | — (16.33 Company 에 `default_warehouse` 필드가 없다. §12) |
-| wip | Work In Progress → `작업 진행 중` | 1154 재공품 | `default_wip_warehouse` |
-| fg | Finished Goods → `완제품` | 1152 제품 | `default_fg_warehouse` |
-| transit | Goods In Transit → `운송 중인 상품` (`warehouse_type=Transit`) | 1158 미착품 | `default_in_transit_warehouse` |
+| role | 코어 영문명 → 표시명 | `account` (manufacturing) | `account` (trading) | Company 필드 |
+|---|---|---|---|---|
+| stores | Stores → `창고`(앱 ko.po) / `백화점`(포크 ko.po, 앱 교정 전) | 1155 원재료 | 1151 상품 | — (16.33 Company 에 `default_warehouse` 필드가 없다. §12) |
+| wip | Work In Progress → `작업 진행 중` | 1154 재공품 | 1151 상품 | `default_wip_warehouse` |
+| fg | Finished Goods → `완제품` | 1152 제품 | 1151 상품 | `default_fg_warehouse` |
+| transit | Goods In Transit → `운송 중인 상품` (`warehouse_type=Transit`) | 1158 미착품 | 1151 상품 | `default_in_transit_warehouse` |
+
+- **계정은 업종 프로필(§4.4, `industry.WAREHOUSE_ACCOUNTS`)이 정한다** (2026-09-08). `apply(company, switch)` 는 창고마다 `industry.decide` 로 채움/전환/유지/사용자값을 판정하고, 전환은 그 창고에 재고 원장(`Stock Ledger Entry`, 취소분 제외)이 **없을 때만** 한다 — 이미 전기된 GL 과 어긋나면 안 된다. 원장이 있으면 `skipped` 에 `has stock ledger entries` 와 목표 계정을 남긴다. trading 의 운송 중 창고를 1158 이 아니라 1151 에 두는 이유는 KB-KOR-004 §4.6.
 
 - **Stores 는 회사 단위 기본 창고로 지정되지 않는다.** 16.33 Company 에는 `default_warehouse` 필드가 없다(17-dev 전용). 회사와 무관한 전역 기본값은 `Stock Settings.default_warehouse` 뿐이고, 품목 단위로는 Item Default 경로가 있다. 기본 입고 창고가 필요하면 둘 중 무엇을 쓸지 결정해야 한다(§11-13). `ROLES['stores']['company_field']` 는 `None` 이 맞다.
 - **왜 Stores 에도 명시하는가.** 창고 계정 우선순위([`stock/__init__.py:56-99`](../../erpnext/stock/__init__.py))는 `Warehouse.account` → 조상 창고 `account` → `Company.default_inventory_account` → 유일 Stock 리프. `Warehouse.account` 가 회사 기본값을 이기므로 기본값이 바뀌어도 Stores 는 1155 를 유지한다. 그룹 `All Warehouses` 는 비워 둔다.
@@ -200,9 +215,9 @@ apply_all(company)
 
 ## 7. 국세청 표준코드 (`nts_codes.py`)
 
-### 7.1 Custom Field 8개
+### 7.1 Custom Field 9개
 
-`ensure_custom_fields()` 가 `create_custom_fields(..., update=True)` 로 멱등 생성한다. `after_install` / `after_migrate` 에서 실행되므로 `bench migrate` 마다 보장된다. 실측: 3회 실행 후 8개 필드의 `modified` 불변.
+`ensure_custom_fields()` 가 `create_custom_fields(..., update=True)` 로 멱등 생성한다. `after_install` / `after_migrate` 에서 실행되므로 `bench migrate` 마다 보장된다. 실측: 3회 실행 후 8개 필드의 `modified` 불변(2026-09-06). 2026-09-08 에 Company `setive_industry_profile` 이 추가돼 9개다 — 국세청 코드와 무관한 필드지만 Company Custom Field 는 이 한 곳에서 관리한다.
 
 | DocType | fieldname | 타입 | 위치 | 용도 |
 |---|---|---|---|---|
@@ -213,7 +228,8 @@ apply_all(company)
 | Account | `setive_nts_column_break` | Column Break | | |
 | Account | `setive_nts_role` | Select `""`/`reconcile_only`/`not_applicable` | | 서식 행 미배정 계정의 역할(KB-KOR-002 §7.2) |
 | Account | `setive_nts_note` | Small Text | | `[미검증] 서식 행: <label> — <note>` |
-| Company | `setive_nts_map_revision` | Data | `chart_of_accounts` 뒤 | 적용한 매핑표의 서식 개정일 `bs=…;is=…;mfg=…` |
+| Company | `setive_industry_profile` | Select `manufacturing`(기본)/`trading` | `chart_of_accounts` 뒤 | 업종 프로필 — 창고 재고계정·기본계정 4개·표준코드 오버레이(§4.4·§5, KB-KOR-004 §4.6) |
+| Company | `setive_nts_map_revision` | Data | `setive_industry_profile` 뒤 | 적용한 매핑표의 서식 개정일 `bs=…;is=…;mfg=…` |
 
 설계 근거:
 
@@ -222,12 +238,14 @@ apply_all(company)
 - `reqd` 없음 — `chart_of_accounts.py` 가 root 계정에만 `ignore_mandatory` 를 주므로 필수 필드가 있으면 회사 생성이 깨진다. `read_only` 없음 — 테넌트 재매핑 허용. 코드는 선행 0 보존을 위해 Data.
 - 코드로 생성하므로 `export_customizations` 회수 대상이 아니다. 앱 모듈 폴더에 `custom/*.json` 이 없음을 확인했다 — 같은 필드를 `custom/` 에도 두면 이중 관리가 되므로 만들지 않는다.
 
-### 7.2 `apply(company, force=False)`
+### 7.2 `apply(company, force=False, reseed_overlay=False)`
 
-매핑표(`data/nts_standard_code_map.json`, schema 2, 272건)를 읽어 회사 원장(`is_group=0`)에 `bulk_update`(`update_modified=False`) 한 문장으로 기록한다.
+매핑표(`data/nts_standard_code_map.json`, schema 2, 272건)에 업종 프로필 오버레이(`profile_overrides[<profile>]`, `nts_codes.effective_accounts`)를 얹어 회사 원장(`is_group=0`)에 `bulk_update`(`update_modified=False`) 한 문장으로 기록한다. 리포트 엔진의 미검증 판정(`nts_report._collect_unverified`)도 같은 함수로 기대값을 만든다 — 한쪽만 오버레이를 알면 trading 회사의 5150 이 '테넌트가 고친 것' 으로 오판돼 미검증 표식이 사라진다(2026-09-08 리뷰에서 잡아 고침).
 
 | 반환 키 | 의미 |
 |---|---|
+| `profile` | 적용한 업종 프로필(§4.4) |
+| `overridden` | 그 프로필의 오버레이로 채운 계정번호(trading: `5150`) |
 | `applied` | 이번에 채운 계정번호 |
 | `kept` | `force=False` 에서 bs/is/mfg/role 중 하나라도 이미 있어 보존한 계정 |
 | `skipped` | 매핑표에 없는 원장(테넌트 추가 계정, 번호 없는 계정은 이름) |
@@ -236,6 +254,7 @@ apply_all(company)
 
 - **미매핑 판정은 네 필드(bs/is/mfg/role)가 모두 빈 것.** `note` 는 보조 정보라 판정에서 뺐다.
 - **`force=True`** 는 매핑표로 전부 덮어쓴다. 서식 개정 뒤 일괄 재적용용이며 테넌트 재매핑을 잃는다.
+- **`reseed_overlay=True`** 는 오버레이 대상 번호(`overlay_numbers` — 어느 프로필에서든 오버라이드되는 번호)만 `kept` 규칙을 무시하고 다시 쓴다. 프로필이 바뀐 저장과 `backfill` 이 쓰며, 그 밖의 테넌트 재매핑은 보존된다. `load_map` 은 `profile_overrides` 의 프로필·번호·키를 검사해 오타를 즉시 throw 한다.
 - **개정 표식**은 Company 필드가 비어 있을 때(또는 force)만 기록하고, 있으면 덮지 않고 `stale` 로 보고한다. 실측값 `bs=2021-10-28;is=2024-03-22;mfg=2023-03-20`.
 - role 도출: 매핑표 role 이 있으면 그대로(reconcile_only 7), 코드도 role 도 없으면 `not_applicable`(3140 인출금 1건). Select 옵션 밖의 role 은 throw.
 - **Custom Field 가 없으면 throw** 한다(`_assert_fields_exist`). `Company.on_update` 안에서 `create_custom_fields` → DDL 을 유발하면 암묵 커밋으로 실패한 회사 생성이 부분 커밋될 수 있어 자동 생성하지 않는다. `after_install` 이 실행되지 않은 사이트는 §8 의 1단계를 먼저 밟는다.
@@ -253,6 +272,7 @@ apply_all(company)
 - 앱을 설치하기 전에 만든 회사가 있다 (KB-OPS-001 §5.1 3a 단계)
 - 훅이 실패한 채 회사가 만들어졌다 / 사용자가 기본계정·창고 계정·표준코드를 지웠다
 - 매핑표가 개정되어 `report_unmapped` 가 `stale=True` 를 보고한다 (이 경우는 `nts_codes.apply(force=True)`)
+- 업종 프로필(§4.4)을 바꾼 뒤 훅이 돌지 않았다 — `backfill(company, switch=True)` 로 전환 규칙을 켠다(`--kwargs "{'company':'<회사명>','switch':True}"`). 기본(`switch=False`)은 빈 값만 채우는 비파괴 실행이라 사용자가 고른 다른 프로필 표준계정을 되돌리지 않는다. 표준코드는 어느 경우든 오버레이 대상(5150)만, 그것도 표준값일 때만 다시 쓴다(`reseed_overlay`, §7.2). `force=True` 로 전부 덮지 않는다(2026-09-08 리뷰).
 
 ```bash
 COMPOSE=docker/development/docker-compose.yml
@@ -260,7 +280,7 @@ SITE=localhost
 EXEC="docker compose -f $COMPOSE exec -T backend"
 COMPANY='<회사명>'
 
-# 1. Custom Field 보장 — install-app(after_install) 또는 migrate(after_migrate) 가 이미 했으면 생략 가능. 기대 8
+# 1. Custom Field 보장 — install-app(after_install) 또는 migrate(after_migrate) 가 이미 했으면 생략 가능. 기대 9(setive_nts_% 8 + setive_industry_profile)
 $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_codes.ensure_custom_fields
 $EXEC bench --site $SITE execute frappe.client.get_count \
   --kwargs "{'doctype':'Custom Field','filters':{'fieldname':['like','setive_nts_%']}}"
@@ -384,7 +404,7 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 6. **훅 값이 `doc.save()` 로 덮일 가능성.** 훅은 `db.set_value` 로 쓰므로 같은 in-memory Company 문서를 훅 뒤에 다시 `save()` 하는 호출자가 있으면 None 으로 덮인다. 위저드 경로(`install_fixtures`)는 `db.set_value` 만 쓰는 것을 확인했지만, 그런 호출자가 생기면 `company.py` 골격이 `doc` 에도 값을 반영하도록 바꿔야 한다.
 7. **5307/5316/5310 `account_type` 비어 있음** — picker 미노출(§6.2-3). 타입 부여는 계정과목표 결정 사항.
 8. **표준재무제표 리포트 미착수** (KB-KOR-002 §11-6). 코드는 채워졌으나 실행기가 없다.
-9. **E2E 스크립트가 저장소 밖.** 회사 생성·측정·삭제 스크립트는 세션 스크래치패드에만 있다. `setive_erpnext_kr/scripts/` 로 편입해 §9.1 의 회사 생성 단계를 재현 가능하게 만드는 것이 후속 과제다.
+9. ~~**E2E 스크립트가 저장소 밖.**~~ **해소됨 (2026-09-08).** `scripts/nts/fixture_company.py` 가 제조·상품매매 회사를 만들고(Company 훅 경로로 프로필 전환까지) Transaction Deletion Record 로 지운다. 절차는 KB-KOR-004 §7.
 10. **`report_unmapped` 허용 역할**(System Manager · Accounts Manager)이 적절한지. 읽기 전용이라 Accounts User 까지 열어도 무방하다.
 
 ## 11. 사용자 결정 필요 항목
@@ -405,7 +425,7 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 | 12 | ~~이미지 frappe 태그 ↔ 포크 브랜치 정합 (§10-1)~~ | **결정됨** — 포크를 이미지와 같은 `v16.33.0` 태그에 고정(2026-09-06 리베이스). 규약은 [`CLAUDE.md`](../../CLAUDE.md) "개발 환경 · 브랜치 규약" | — |
 | 13 | 기본 입고 창고 (§5) | 없음 — 16.33 에 `Company.default_warehouse` 필드가 없다 | `Stock Settings.default_warehouse` 전역 지정 / Item Default 경로 / 지정하지 않음 |
 | 14 | `company_defaults.DEFAULTS` 의 16.33 부재 필드 3개 (§4.1) | 그대로 씀 — 신규 16.33 사이트에서 1054 로 회사 생성 실패 | 세 항목 제거 + `meta.has_field` 필터로 `skipped` 처리 |
-| 15 | 창고→계정 매핑의 업종 분기 (§5) | 제조업 고정(Stores→1155·WIP→1154·FG→1152·Transit→1158). **2026-09-08 결정: 초기 타깃이 제조업이라 보류** | 상품매매는 창고 4개→1151 + `default_inventory/expense/income/discount_account` 한 세트를 바꿔야 하며(레시피는 앱 `scripts/nts/fixture_company.py` `configure_trading`), 대안으로 코어 `Company.enable_item_wise_inventory_account`(회사 생성 시점에만 전환 가능). 분기 신호(KSIC) 는 Company 에 저장되지 않아 Custom Field 가 선행. 근거·실측은 [KB-KOR-004 §8-3](./KB-KOR-004_nts_financial_statements.md) |
+| 15 | ~~창고→계정 매핑의 업종 분기 (§5)~~ | **결정·구현됨 (2026-09-08)** — Company `setive_industry_profile` 로 분기(§4.4·§5). 겸업 테넌트용 코어 `enable_item_wise_inventory_account` 검토는 KB-KOR-004 §8-6 | — |
 
 ---
 
@@ -421,3 +441,4 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 - **§4.3 · §5 — `Company.default_warehouse` 는 16.33 에 없습니다.** 초판은 "`default_warehouse` 는 코어가 채운다"고 적었으나 16.33 `create_default_warehouses` 는 창고와 그룹만 만들고 Company 필드를 채우지 않습니다. 결과적으로 Stores 창고는 계정 1155 만 붙고 회사 단위 기본 창고로 지정되는 경로가 없습니다(§11-13). §4.3 제목의 "15 + 4" 숫자는 17-dev 실측 기준이라 뺐습니다 — 16.33 에서 재실측하기 전까지 숫자를 쓰지 않습니다.
 - **§4.1 · §4.3 · §5 의 `company.py` 라인 번호가 전부 어긋났습니다.** `set_default_accounts` 741 → 623, `validate_default_accounts` 360 → 248, `create_default_warehouses` 495 → 383, `validate_provisional_account_for_non_stock_items` 688 → 570. 다음 upstream 이동에도 견디도록 **함수명 기준 인용으로 바꿨습니다.** 이 문서의 남은 라인 번호(`stock/__init__.py`, `warehouse.py`, `work_order.py` 등)는 17-dev 시점 값이며 몇 줄씩 어긋날 수 있습니다. 확인은 `grep -n "def <함수명>" <파일>` 로 합니다.
 - **§10-1 의 환경 불일치는 해소됐습니다** (2026-09-06 리베이스). 대신 `bench migrate` 미실행 상태가 새 미해결 항목입니다.
+- **2026-09-08 — §4.3 "훅은 이 필드들에 개입하지 않는다" 와 §5 "창고 계정은 1155/1154/1152/1158 고정".** 업종 프로필(§4.4)이 생기면서 프로필이 바뀐 저장에서는 재고·매출원가·매출·매출할인 4개 필드와 창고 계정을 전환한다. 그 밖의 저장에서는 이전 서술대로다. `warehouses.ROLES` 의 `account_number` 키는 없어졌고 계정은 `industry.WAREHOUSE_ACCOUNTS` 가 정한다. 같은 이유로 §3.3 의 "빈 값만 채운다" 는 전환 규칙(`industry.decide`)으로 확장됐다.

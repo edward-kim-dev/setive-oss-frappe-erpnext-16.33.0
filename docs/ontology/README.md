@@ -36,3 +36,4 @@ ONT 문서는 산문 설명이 아니라 **추출 가능한 표**를 중심으�
 | ID | 제목 | 상태 |
 |---|---|---|
 | [ONT-CLS-001](./ONT-CLS-001_korean_industry_code_systems.md) | 국내 업종 코드체계 (KSIC · 국세청 업종코드 · 산재보험 사업종류) | active |
+| [ONT-ENT-001](./ONT-ENT-001_inventory_cost_flow.md) | 재고·원가 흐름 개념 모델 (재고자산 · 매출원가 블록 · 제조원가) | active |

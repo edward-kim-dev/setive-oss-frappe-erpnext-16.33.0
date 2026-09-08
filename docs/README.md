@@ -20,6 +20,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | ID | 제목 | 도메인 |
 |---|---|---|
 | [KB-ARCH-001](./kb/KB-ARCH-001_setup_wizard_architecture.md) | 셋업 위저드 확장 아키텍처 (Frappe Core ↔ ERPNext App) | 아키텍처 |
+| [KB-ARCH-002](./kb/KB-ARCH-002_erpnext_frappe_customization_mechanics.md) | ERPNext·Frappe 커스터마이징 역학 — 재고 GL · against · 계정 결정 · 훅 · 운영 절차 | 아키텍처 |
 | [KB-DEV-001](./kb/KB-DEV-001_makefile_automation.md) | Makefile 개발 자동화 타겟 | 개발 도구 |
 | [KB-LOC-001](./kb/KB-LOC-001_regional_localization.md) | 시스템 지역 기본값 및 사용 언어 제한 | 한글화 |
 | [KB-LOC-002](./kb/KB-LOC-002_gettext_po_compilation.md) | Gettext 번역 탐색 순위와 PO/MO 컴파일 | 한글화 |
@@ -35,6 +36,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | ID | 제목 | 대상 |
 |---|---|---|
 | [ONT-CLS-001](./ontology/ONT-CLS-001_korean_industry_code_systems.md) | 국내 업종 코드체계 (KSIC · 국세청 업종코드 · 산재보험 사업종류) | 분류체계 |
+| [ONT-ENT-001](./ontology/ONT-ENT-001_inventory_cost_flow.md) | 재고·원가 흐름 개념 모델 (재고자산 · 매출원가 블록 · 제조원가) | 엔티티 |
 
 작성 규약은 [`docs/ontology/README.md`](./ontology/README.md)에도 별도로 있습니다.
 

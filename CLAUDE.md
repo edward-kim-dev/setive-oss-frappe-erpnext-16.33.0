@@ -92,7 +92,7 @@ permission_query_conditions / has_permission / regional_overrides
 ### `erpnext/hooks.py` 를 수정하지 않는다
 upstream 최근 1년 커밋 **55회**. 리베이스 충돌의 주범이다. 훅이 필요하면 앱의 `hooks.py` 에 쓴다. Frappe 가 앱별 hooks 를 병합한다.
 
-> 2026-09-07 기준 포크가 수정하는 upstream 파일은 `erpnext/public/js/setup_wizard.js` · `erpnext/setup/setup_wizard/setup_wizard.py` · `erpnext/locale/main.pot` 뿐이다. 과거 `erpnext/hooks.py` 와 `erpnext/setup/install.py` 를 고쳤던 코드(커밋 `0dd24bc04c`)는 앱 `korea/common/system_defaults.py` 로 이관하고 두 파일을 v16.33.0 원본으로 복원했다.
+> 2026-09-14 기준 포크가 **수정**하는 upstream 파일은 `README.md`(상단에 SETIVE-README 안내 5줄) · `erpnext/public/js/setup_wizard.js` · `erpnext/setup/setup_wizard/setup_wizard.py` · `erpnext/locale/main.pot` 4건이다. 리베이스 충돌은 이 4건에서만 난다 — 확인은 `git diff --name-status v16.33.0..HEAD | awk '$1=="M"'`. 나머지 포크 파일은 전부 신규 추가분이다. 과거 `erpnext/hooks.py` 와 `erpnext/setup/install.py` 를 고쳤던 코드(커밋 `0dd24bc04c`)는 앱 `korea/common/system_defaults.py` 로 이관하고 두 파일을 v16.33.0 원본으로 복원했다.
 
 ### `erpnext/regional/korea/` 를 만들지 않는다
 `erpnext/regional/` 에 italy·uae·australia 가 실재하지만 이는 **upstream 패턴**이다. 한국은 동작하지 않는다 — `frappe.scrub("Korea, Republic of")` 가 `korea,_republic_of` 를 만들어 쉼표 때문에 파이썬 import 가 불가능하고, **그 예외를 프레임워크가 조용히 삼킨다**. 무증상 실패다.

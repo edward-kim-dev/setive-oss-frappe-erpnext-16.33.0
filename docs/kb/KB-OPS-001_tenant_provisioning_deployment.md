@@ -7,7 +7,7 @@ applies_to:
   - erpnext@16.33.0
   - frappe@16.31.0            # 이미지 frappe/erpnext:v16.33.0 내장. 태그 숫자와 다르다 (§1.7)
   - docker/development/docker-compose.yml
-verified_on: 2026-09-13
+verified_on: 2026-09-14
 verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교) + v16.33.0 리베이스 후 버전/스큐 재실측 + setive 개명 전후 get_versions 재실측
 related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002, KB-KOR-003, KB-LOC-003]
 ---
@@ -242,16 +242,52 @@ docker compose -f $COMPOSE exec -T backend /home/frappe/frappe-bench/env/bin/pyt
 
 #### 이미지 태그를 올릴 때 절차
 
+> **한 번에 복붙하지 마십시오.** 아래는 4구간이고 사이마다 사람 판단이 들어갑니다. 특히 2구간의 리베이스는 `main.pot` 충돌로 **거의 확실히 멈춥니다**. 끝까지 이어 붙여 실행하면 충돌 마커가 남은 워크트리로 `migrate` 를 돌리고, 검증 없이 공유 리모트를 재작성합니다.
+
+**1구간 — 백업.** 되돌릴 수단을 먼저 만듭니다.
+
 ```bash
-git fetch upstream --tags                                   # upstream = frappe/erpnext
-git branch backup/setive-v16.33-$(date +%Y%m%d)             # 되돌릴 유일한 수단
-git rebase --onto v16.34.1 v16.33.0 setive                  # SETIVE 커밋만 새 태그 위로 재생
-# compose 의 image: 태그 상향 → up -d
-docker volume rm setive-erp-dev_erpnext-dist                # ★ 안 지우면 옛 번들 자산이 남는다 (§8.1)
+git fetch upstream --tags                       # upstream = frappe/erpnext
+NEW=v16.34.1                                    # 올릴 태그
+BK=backup/setive-v16.33-$(date +%Y%m%d)
+LEASE=$(git rev-parse origin/setive)            # 4구간 push 의 기준값. 여기서 고정한다
+git branch "$BK" && git push origin "$BK"       # 로컬 클론을 잃어도 되돌릴 수 있게
+```
+
+**2구간 — 리베이스.** 충돌 범위를 먼저 계산하고 시작합니다.
+
+```bash
+# 충돌 가능 집합 = 포크가 '수정'한 upstream 파일 ∩ upstream 이 이 구간에서 바꾼 파일
+comm -12 <(git diff --name-status v16.33.0..HEAD | awk '$1=="M"{print $2}' | sort) \
+         <(git diff --name-only v16.33.0.."$NEW" | sort)
+# v16.34.1 기준 실측: erpnext/locale/main.pot 하나
+
+git rebase --onto "$NEW" v16.33.0 setive
+```
+
+충돌이 위에서 계산한 집합 밖에서 나면 멈추고 원인부터 확인하십시오. `main.pot` 해소는 [`KB-LOC-003`](./KB-LOC-003_fork_local_translation.md) §6 인데 **그 절의 명령에는 `v16.33.0` 이 하드코딩돼 있습니다.** 올리는 태그로 바꿔 읽으십시오 — `git show "$NEW":…`, 줄 수 기대값도 `git show "$NEW":erpnext/locale/main.pot | wc -l` + 105 로 다시 구합니다(v16.34.1 이면 63487 + 105 = 63592. v16.33.0 의 63449 + 105 = 63554 를 그대로 쓰면 검증이 통과하면서 upstream 변경분이 조용히 되돌아갑니다).
+
+**3구간 — 반영과 검증.** 여기까지 통과해야 push 합니다.
+
+```bash
+# compose 의 image: 태그를 $NEW 로 상향 → up -d
+docker volume rm setive-erp-dev_erpnext-dist     # ★ 안 지우면 옛 번들 자산이 남는다 (§8.1)
 # 앱 pip 재설치 (§1.4) — 컨테이너 재생성으로 site-packages 링크가 사라진다
 docker compose -f $COMPOSE exec -T backend bench --site $SITE migrate   # ★ 아래
 # 위 확인 명령 3종 재실행
 ```
+
+**4구간 — origin 반영.** 검증을 통과한 뒤에만.
+
+```bash
+git push --force-with-lease=setive:"$LEASE" origin setive
+```
+
+> **리베이스 뒤 `git push` 가 non-fast-forward 로 거절되는 것은 정상입니다.** 리베이스가 히스토리를 다시 썼기 때문입니다. `git pull` 로 합치지 마십시오 — 리베이스로 새로 쓴 **SETIVE 커밋 21건**이 옛 사본과 겹쳐 두 벌이 되고, 그 옛 사본이 리베이스 전 `main.pot` 을 되살려 방금 해소한 충돌을 내용 충돌로 되돌립니다(upstream 커밋은 두 벌이 되지 않습니다 — `v16.33.0` 이 새 태그의 조상이라 이미 포함돼 있습니다).
+>
+> **`--force-with-lease` 에 기준값을 명시하는 이유.** 값 없는 `--force-with-lease` 는 원격의 실제 상태가 아니라 로컬 `refs/remotes/origin/setive` 와 비교합니다. 리베이스와 push 사이에 `git fetch`(인자 없는 형태 포함)나 IDE 백그라운드 fetch 가 한 번이라도 돌면 남의 새 커밋이 기준값에 흡수돼 **거절 없이 덮어씁니다.** 1구간에서 고정한 `$LEASE` 를 쓰거나 `--force-if-includes` 를 함께 주십시오. `--force` 는 쓰지 않습니다. 이 절차의 fetch 를 `upstream` 한정으로 둔 것도 같은 이유입니다.
+>
+> `$BK` 로는 이 사고를 되돌릴 수 없습니다 — `$BK` 는 리베이스 이전 **로컬** 스냅샷이라 남이 올린 커밋을 애초에 담고 있지 않습니다.
 
 > 백업 브랜치 접두사는 **백업 대상 브랜치명**을 따릅니다. 2026-09-08 주 브랜치 개명(`develop` → `setive`) 이전에 만든 백업은 `backup/develop-*` 접두사를 갖습니다 — 현존하는 `backup/develop-17dev-20260906`(로컬·origin 양쪽 보존)이 그것이며, 여기의 `develop` 은 개명 전 이 포크의 브랜치명이지 upstream 의 `develop` 이 아닙니다. 스냅샷은 당시 상태를 가리켜야 하므로 소급 개명하지 않습니다.
 
@@ -707,3 +743,6 @@ $EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.
   3. **백업 브랜치 명명 접두사를 `backup/develop-` → `backup/setive-` 로 바꿨습니다.** 이 명령은 실패하지 않고 성공하므로 방치하면 잘못된 이름이 무증상으로 쌓입니다. [`CLAUDE.md`](../../CLAUDE.md) "브랜치 규약" 의 명명 규칙도 함께 고쳤습니다 — `CLAUDE.md` 는 `docs/` 밖이라 자체 정정 장치가 없어 그 사실을 여기 남깁니다. 기존 `backup/develop-17dev-20260906` 은 개명 이전 스냅샷이므로 이름을 그대로 둡니다([KB-LOC-003](./KB-LOC-003_fork_local_translation.md) §6 이 번역 43건의 복원 경로로 이 정확한 이름을 가리킵니다).
 
   §1.7 "어긋나면 어떻게 깨지는가 — 2026-09-06 실사고" 와 위 "초판에는 포크 브랜치와 이미지 태그의 정합 규칙이 없었습니다" 항목의 "포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있었다" 는 당시 사실 기록이라 그대로 둡니다. 그 `develop` 은 upstream frappe/erpnext 의 브랜치입니다.
+- **2026-09-14: §1.7 "이미지 태그를 올릴 때 절차" 에 `origin` 반영 단계가 없었습니다.** `setive` 는 `origin/setive` 를 추적하므로 리베이스 뒤 `git push` 는 non-fast-forward 로 거절되는데, 초판에는 그 안내도 `push` 명령도 없었습니다. 백업 브랜치 push 와 `git push --force-with-lease=setive:"$LEASE" origin setive` 를 넣었습니다. 기준값 `$LEASE` 를 명시하는 이유는 값 없는 `--force-with-lease` 가 원격의 실제 상태가 아니라 로컬 `origin/setive` 와 비교해, 중간에 `git fetch` 가 한 번이라도 돌면 남의 커밋을 거절 없이 덮기 때문입니다(git 2.53 man page 의 `--force-if-includes` 항목). **개명과 무관한 기존 공백입니다.**
+- **2026-09-14: 같은 절차를 단일 코드블록으로 두면 위험합니다.** 리베이스는 `main.pot` 충돌로 거의 확실히 멈추는데 블록에 `set -e` 도 `&&` 도 없고 중간 단계(compose 태그 상향·pip 재설치·확인 3종)가 주석뿐이라, 통째로 복붙하면 충돌 마커가 남은 워크트리로 `migrate` 를 돌리고 검증 없이 공유 리모트를 재작성합니다. 수동 개입 지점에서 4구간으로 쪼갰습니다.
+- **2026-09-14: 포크가 수정하는 upstream 파일 목록에서 `README.md` 가 빠져 있었습니다.** [`CLAUDE.md`](../../CLAUDE.md) 가 `setup_wizard.js` · `setup_wizard.py` · `main.pot` "뿐"이라고 적었으나 `git diff --name-status v16.33.0..HEAD` 는 `M README.md`(상단 5줄 삽입, 커밋 `d787d46753`)를 함께 냅니다. upstream 이 README 상단 배지·링크를 자주 고치므로 실충돌 후보입니다. 4건으로 정정했습니다. 충돌 범위는 인용이 아니라 계산하도록 §1.7 에 `comm` 명령을 넣었습니다 — "`v16.33.0..v16.34.1` 에서 upstream 이 `main.pot` 만 바꾼다" 는 서술도 부정확했습니다(실측 159파일 변경, 그중 **포크가 손대는 파일과 겹치는 것**이 `main.pot` 하나).

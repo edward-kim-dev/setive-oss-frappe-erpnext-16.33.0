@@ -7,8 +7,8 @@ applies_to:
   - erpnext@16.33.0
   - frappe@16.31.0
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-07
-verified_by: babel read_po 실측 + 번역 사전 런타임 조회(8/8) + v16.33.0 리베이스 시 main.pot·ko.po diff 실측
+verified_on: 2026-09-14
+verified_by: babel read_po 실측 + 번역 사전 런타임 조회(8/8) + v16.33.0 리베이스 시 main.pot·ko.po diff 실측 + v16.34.1 대비 main.pot 줄 수·충돌 집합 실측
 related: [KB-LOC-002, KB-KOR-001, KB-OPS-001]
 ---
 
@@ -118,18 +118,21 @@ babel 2.16 의 `Message.__cmp__` 정렬키는 `(msgid, msgctxt)` 이므로 `Acti
 
 2026-09-06 `develop`(17.0.0-dev) → 태그 `v16.33.0` 리베이스에서 실제로 쓴 절차입니다. `ko.po` 는 포크가 손대지 않으므로 충돌 대상이 `main.pot` 하나로 줄어 있어야 정상입니다.
 
+> **태그를 변수로 두십시오.** 아래는 `v16.33.0` 리베이스에서 쓴 것이지만 명령 자체는 태그에 의존합니다. 옛 태그 리터럴을 그대로 실행하면 upstream 변경분을 통째로 되돌리면서 **검증 3종이 모두 통과합니다.**
+
 ```bash
+NEW=v16.33.0          # ← 올리는 태그로 바꾼다 (예: v16.34.1)
+
 # 1. 새 태그의 원본을 그대로 채택 (SETIVE 델타를 여기서 섞지 않는다)
-git checkout --theirs erpnext/locale/main.pot     # rebase 중에는 --theirs 가 upstream 쪽
-git show v16.33.0:erpnext/locale/main.pot > erpnext/locale/main.pot
+git show "$NEW":erpnext/locale/main.pot > erpnext/locale/main.pot
 
 # 2. SETIVE 블록만 정렬 위치에 다시 삽입 (삭제 0, 순수 추가여야 한다)
 #    삽입 후 확인 — 기대: 105 0
-git diff --numstat v16.33.0..HEAD -- erpnext/locale/main.pot
+git diff --numstat "$NEW"..HEAD -- erpnext/locale/main.pot
 
-# 3. 원본 바이트가 보존됐는지 줄 수로 확인 — 기대: 63449 + 105 = 63554
-git show v16.33.0:erpnext/locale/main.pot | wc -l
-wc -l erpnext/locale/main.pot
+# 3. 원본 바이트가 보존됐는지 줄 수로 확인 — 기대: <원본> + 105
+git show "$NEW":erpnext/locale/main.pot | wc -l    # v16.33.0 → 63449 / v16.34.1 → 63487
+wc -l erpnext/locale/main.pot                       # 위 + 105 (63554 / 63592)
 
 # 4. 위치 주석의 줄번호가 실제 소스와 맞는지
 grep -n 'setup_wizard.js:' erpnext/locale/main.pot | grep -A1 KSIC
@@ -247,6 +250,8 @@ $EXEC bench --site $SITE execute frappe.translate.get_all_translations \
 - **초판 §2.4 "frappe 코어 문자열은 포크 `ko.po` 맨 끝 비정렬 블록에 둔다"도 함께 철회합니다.** `erpnext/hooks.py` 의 `ignore_translatable_strings_from = ["frappe"]` 때문에 frappe 문자열이 erpnext `main.pot` 에 추출되지 않는다는 근거 자체는 지금도 맞지만, 결론은 "포크 파일 끝"이 아니라 "앱 `ko.po`"입니다. 앱 파일은 Crowdin·CI 재생성 대상이 아니라 위치 제약이 없습니다.
 - **초판 §5 의 "`erpnext/translations/ko.csv` 로 옮기는 대안"은 더 이상 검토 대상이 아닙니다.** 앱 `ko.po` 가 같은 목적(Crowdin 비관리 경로)을 달성하면서 MO 로딩 순서 문제도 없습니다. CSV 는 로드 순서가 `csv` → `mo` 라 같은 키가 PO 에 있으면 무시됩니다(KB-LOC-002 §2).
 - 초판은 이 문서를 "포크 로컬 번역" 규약으로 불렀습니다. 제목을 바꿨으나 파일명과 ID(`KB-LOC-003`)는 링크 정합을 위해 유지합니다.
+- **2026-09-14: §6 step 1 의 `git checkout --theirs` 주석이 뒤집혀 있었습니다.** "rebase 중에는 `--theirs` 가 upstream 쪽" 이라고 적었으나 반대입니다 — `git help rebase` 의 `-m` 항목이 "the side reported as ours is the so-far rebased series, starting with `<upstream>`, and theirs is the working branch" 라고 명시합니다. 즉 rebase 중 `--ours` 가 upstream(새 태그) 쪽이고 `--theirs` 는 재생되는 SETIVE 커밋 쪽입니다. 그 명령은 §6 이 막으려던 '포크의 낡은 pot' 을 꺼냅니다. 다음 줄의 `git show` 가 덮어써 실해는 없었지만 **줄 자체를 삭제**했습니다 — `git show` 하나로 충분합니다.
+- **2026-09-14: §6 의 명령과 기대 줄 수가 `v16.33.0` 에 하드코딩돼 있었습니다.** 다른 태그로 올리며 그대로 실행하면 `git show v16.33.0:…` 이 upstream 변경분(`v16.34.1` 기준 `+510/−472`)을 통째로 되돌리는데, **검증 3종이 전부 통과합니다** — `--numstat` 는 `105 0`, 줄 수는 63554 로 맞아떨어지기 때문입니다. `NEW` 변수로 일반화하고 태그별 기대값(v16.33.0 → 63449, v16.34.1 → 63487)을 병기했습니다. 실측으로 확인: `git show <태그>:erpnext/locale/main.pot | wc -l`.
 
 ## frappe 코어 메시지 번역
 

@@ -7,8 +7,8 @@ applies_to:
   - erpnext@16.33.0
   - frappe@16.31.0            # 이미지 frappe/erpnext:v16.33.0 내장. 태그 숫자와 다르다 (§1.7)
   - docker/development/docker-compose.yml
-verified_on: 2026-09-07
-verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교) + v16.33.0 리베이스 후 버전/스큐 재실측
+verified_on: 2026-09-13
+verified_by: v16.33 소스 확인 + 개발 컨테이너 실측(라이브 API 호출·migrate 전후 비교) + v16.33.0 리베이스 후 버전/스큐 재실측 + setive 개명 전후 get_versions 재실측
 related: [KB-DEV-001, KB-ARCH-001, KB-LOC-002, KB-KOR-003, KB-LOC-003]
 ---
 
@@ -207,14 +207,27 @@ docker compose -f $COMPOSE exec -T backend \
 
 1의 `git describe` 가 `v16.33.0-...` 이 아닌 다른 태그·브랜치를 가리키면 그 자체로 실패입니다. 2와 3의 `erpnext` 숫자가 다른 것은 정상입니다(3은 마운트된 포크를 읽음) — 단 **포크가 어느 태그 위에 있는지**로 1과 대조해야 합니다.
 
-> **`get_installed_apps_info` / About 대화상자로 버전을 판정하지 마십시오.** 브랜치명이 `master` 가 아니면 `frappe/utils/change_log.py::get_versions` 가 `hooks.<브랜치>_version` 을 함께 싣고, 프론트는 그쪽을 보여줍니다. 이 포크의 브랜치명은 `develop` 이고 [`erpnext/hooks.py`](../../erpnext/hooks.py) 의 `develop_version = "15.x.x-develop"` 은 upstream 이 갱신하지 않는 상수라, 실측 결과가 이렇게 나옵니다.
+> **`get_installed_apps_info` 계열 출력으로 버전을 판정하지 마십시오.** 표시 값이 **브랜치 이름에 좌우**됩니다. `frappe/utils/change_log.py::get_versions` 는 브랜치명이 `master` 가 아니면 `hooks.<브랜치>_version` 을 **그 이름 정확 일치**로 찾아 `branch_version` 키로 함께 싣고, `frappe/utils/__init__.py:777::get_installed_apps_info` 가 `branch_version or version` 으로 골라 소비자에게 넘깁니다. 즉 **앱 hooks 에 현재 브랜치명과 같은 이름의 상수가 있으면 그 상수가 실제 버전을 덮어씁니다.**
+>
+> 거짓 값이 드러나는 곳은 `get_installed_apps_info` 소비자 셋입니다 — `Installed Applications` DocType(`installed_applications.py:35`), `get_site_info`(`utils/__init__.py:820`), 그리고 About 대화상자의 **"앱 버전 복사" 버튼**(`about.js:162` 의 `branch_version || version`).
+>
+> **About 대화상자 본문은 해당하지 않습니다.** `about.js:85` 가 `get_versions` 를 직접 호출하고 `get_version_text`(`about.js:95-101`)는 `${app.version} (${app.branch})` 를 쓰므로 `branch_version` 을 읽지 않습니다. 본문은 개명 전에도 `erpnext: 16.33.0 (develop)` 이었고 지금은 `16.33.0 (setive)` 입니다 — 바뀐 것은 괄호 안 브랜치명뿐입니다.
+>
+> 지금은 브랜치가 `setive` 이고 [`erpnext/hooks.py`](../../erpnext/hooks.py) 에 `setive_version` 이 없어 덮어쓰기가 일어나지 않습니다. **맞게 보이는 것은 우연입니다** — 표시 경로가 신뢰할 수 있게 된 것이 아니라 브랜치명이 hooks 키와 겹치지 않을 뿐입니다.
 >
 > ```
-> [{"app_name": "frappe", "version": "16.31.0", ...},
->  {"app_name": "erpnext", "version": "15.x.x-develop (6eb555d)", "branch": "develop"}, ...]
+> # get_versions()["erpnext"] — 개명 전후 bench console 실측 (같은 커밋 01f3650)
+> 개명 전 (develop): version "16.33.0", branch_version "15.x.x-develop (01f3650)"
+> 개명 후 (setive) : version "16.33.0", branch_version 없음
+>
+> # 위 값에서 branch_version or version 으로 결정되는 get_installed_apps_info() 출력
+> 개명 전: {"app_name": "erpnext", "version": "15.x.x-develop (01f3650)", "branch": "develop"}
+> 개명 후: {"app_name": "erpnext", "version": "16.33.0", "branch": "setive"}
 > ```
 >
-> `15.x.x` 는 **거짓 표시**입니다. 판정은 `erpnext.__version__`(위 3번)으로만 합니다.
+> `develop_version = "15.x.x-develop"` 은 upstream 이 갱신하지 않는 상수라 erpnext 16.33.0 이 `15.x.x` 로 보고됐습니다. **거짓 표시입니다.** 그 상수는 [`erpnext/hooks.py`](../../erpnext/hooks.py):23 에 그대로 남아 있고 조회가 이름 정확 일치이므로, **브랜치명을 다시 `develop` 으로 두면 같은 거짓 표시가 복귀합니다**(현재 erpnext hooks 의 `*_version` 상수는 `develop_version` 하나뿐이라 그 이름만 위험합니다).
+>
+> 반대로 없어진 `branch_version` 을 되살리려고 `erpnext/hooks.py` 에 `setive_version` 을 추가하지 마십시오 — upstream 파일이며 CLAUDE.md "금지 사항" 에 걸립니다. 판정은 브랜치명과 무관하게 `erpnext.__version__`(위 3번)으로만 합니다.
 
 스큐 잔재 탐지 — 포크가 부르는데 컨테이너 frappe 에 없는 심볼이 있는지:
 
@@ -231,14 +244,16 @@ docker compose -f $COMPOSE exec -T backend /home/frappe/frappe-bench/env/bin/pyt
 
 ```bash
 git fetch upstream --tags                                   # upstream = frappe/erpnext
-git branch backup/develop-v16.33-$(date +%Y%m%d)            # 되돌릴 유일한 수단
-git rebase --onto v16.34.1 v16.33.0 develop                 # SETIVE 커밋만 새 태그 위로 재생
+git branch backup/setive-v16.33-$(date +%Y%m%d)             # 되돌릴 유일한 수단
+git rebase --onto v16.34.1 v16.33.0 setive                  # SETIVE 커밋만 새 태그 위로 재생
 # compose 의 image: 태그 상향 → up -d
 docker volume rm setive-erp-dev_erpnext-dist                # ★ 안 지우면 옛 번들 자산이 남는다 (§8.1)
 # 앱 pip 재설치 (§1.4) — 컨테이너 재생성으로 site-packages 링크가 사라진다
 docker compose -f $COMPOSE exec -T backend bench --site $SITE migrate   # ★ 아래
 # 위 확인 명령 3종 재실행
 ```
+
+> 백업 브랜치 접두사는 **백업 대상 브랜치명**을 따릅니다. 2026-09-08 주 브랜치 개명(`develop` → `setive`) 이전에 만든 백업은 `backup/develop-*` 접두사를 갖습니다 — 현존하는 `backup/develop-17dev-20260906`(로컬·origin 양쪽 보존)이 그것이며, 여기의 `develop` 은 개명 전 이 포크의 브랜치명이지 upstream 의 `develop` 이 아닙니다. 스냅샷은 당시 상태를 가리켜야 하므로 소급 개명하지 않습니다.
 
 **`migrate` 를 빠뜨리면 코드만 새 태그가 되고 사이트 DB 는 옛 태그 스키마로 남습니다.** 리베이스는 파일만 바꿉니다(§2). 2026-09-06 리베이스 직후 `migrate` 없이 실측된 결손:
 
@@ -686,3 +701,9 @@ $EXEC curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Host: $SITE" http://127.
   2. 엔트리포인트가 앱으로 이관된 `configure_target_languages` 를 옛 경로(`erpnext.setup.install...`)로 호출 → 앱 경로로 정정. **코드를 이관할 때 compose 엔트리포인트도 함께 고쳐야 합니다**(Makefile 만 고쳤다가 놓쳤습니다).
   3. 신규 사이트에는 앱이 설치돼 있지 않음 → `list-apps | grep -q` 로 확인 후 `install-app` 하는 단계 추가(멱등).
 - **`compile_translations` 는 `sites/assets` 심볼릭이 있어야 볼륨에 씁니다.** 신규 부트스트랩에서는 그 심볼릭이 아직 없어 MO 가 `sites` 볼륨 안 실제 디렉터리에 쓰이고, 나중에 심볼릭이 생기면서 가려집니다. 로그는 "MO file created" 로 성공을 보고하는데 번역은 적용되지 않는 **조용한 실패**입니다. 엔트리포인트에서 컴파일 전에 `ln -sfn` 으로 심볼릭을 보장하고, 컴파일 후 MO 존재를 확인해 경고를 남깁니다.
+- **2026-09-08: 포크의 주 브랜치를 `develop` → `setive` 로 개명했습니다.** 같은 날 `setive` 생성·`origin` push·GitHub 기본 브랜치 전환·**로컬** `develop` 삭제까지 했고, `origin/develop` 삭제와 `origin/HEAD` → `origin/setive` 재설정은 2026-09-13 입니다. 세 가지를 정정했습니다.
+  1. **§1.7 의 "이 포크의 브랜치명은 `develop` 이고 …" 는 현재 사실이 아니었습니다.** 브랜치가 `setive` 이고 [`erpnext/hooks.py`](../../erpnext/hooks.py) 에 `setive_version` 이 없어 `get_versions` 가 `branch_version` 을 싣지 못하므로, `Installed Applications` DocType · `get_site_info` · About 의 **"앱 버전 복사"** 출력에서 `15.x.x-develop` 이 사라지고 `16.33.0` 만 남습니다(개명 전후 bench console `get_versions()` 실측 대조). **보이지 않는 것이 정상이며 설정 이상이 아닙니다.** 지침 자체는 유지됩니다 — 메커니즘이 `hooks.<브랜치>_version` 상수 조회라, 브랜치명이 hooks 상수와 겹치는 순간 거짓 표시가 되살아납니다. 옛 실측 출력은 그 실패 양상의 증거로 "개명 이전" 라벨을 붙여 §1.7 에 남겼습니다. **덧붙여 초판의 "`get_installed_apps_info`(About 대화상자)" 라는 등치는 틀렸습니다** — About **본문**은 `about.js:85` 가 `get_versions` 를 직접 호출해 `${app.version} (${app.branch})` 로 그리므로 `branch_version` 을 읽지 않고, 개명 전에도 `16.33.0 (develop)` 이었습니다. `branch_version` 이 드러나던 UI 는 About 의 "앱 버전 복사" 버튼(`about.js:162`)뿐입니다. 위 2026-09-07 항목은 그 등치 오류를 포함한 **개명 이전 기록**으로 읽으십시오.
+  2. **§1.7 "이미지 태그를 올릴 때 절차" 의 `git rebase --onto v16.34.1 v16.33.0 develop` 은 그대로 실행하면 실패합니다**(`develop` 리비전 없음). `setive` 로 정정했습니다.
+  3. **백업 브랜치 명명 접두사를 `backup/develop-` → `backup/setive-` 로 바꿨습니다.** 이 명령은 실패하지 않고 성공하므로 방치하면 잘못된 이름이 무증상으로 쌓입니다. [`CLAUDE.md`](../../CLAUDE.md) "브랜치 규약" 의 명명 규칙도 함께 고쳤습니다 — `CLAUDE.md` 는 `docs/` 밖이라 자체 정정 장치가 없어 그 사실을 여기 남깁니다. 기존 `backup/develop-17dev-20260906` 은 개명 이전 스냅샷이므로 이름을 그대로 둡니다([KB-LOC-003](./KB-LOC-003_fork_local_translation.md) §6 이 번역 43건의 복원 경로로 이 정확한 이름을 가리킵니다).
+
+  §1.7 "어긋나면 어떻게 깨지는가 — 2026-09-06 실사고" 와 위 "초판에는 포크 브랜치와 이미지 태그의 정합 규칙이 없었습니다" 항목의 "포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있었다" 는 당시 사실 기록이라 그대로 둡니다. 그 `develop` 은 upstream frappe/erpnext 의 브랜치입니다.

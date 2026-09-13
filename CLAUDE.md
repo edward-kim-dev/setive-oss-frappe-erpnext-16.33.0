@@ -129,8 +129,9 @@ SITE=localhost
 
 - 포크는 compose 가 쓰는 **이미지 태그와 같은 upstream 태그 위에 SETIVE 커밋을 리베이스**해 유지한다. 현재 `frappe/erpnext:v16.33.0` ↔ `v16.33.0`. 확인: `git describe --tags` → `v16.33.0-<n>-g<sha>`.
   어긋나면 무증상으로 전표 경로가 깨진다(2026-09-06 사고: 포크가 17-dev 인데 이미지 frappe 는 16.31.0 → `Meta.get_translated_label` 부재). 근거·절차는 [`docs/kb/KB-OPS-001`](docs/kb/KB-OPS-001_tenant_provisioning_deployment.md) §1.7.
+- 포크의 주 브랜치는 `setive` 다 (2026-09-08 `develop` 에서 개명, GitHub 기본 브랜치도 `setive`). upstream 의 `develop` 과 혼동하지 않는다. 개명으로 `get_installed_apps_info` 계열 출력(`Installed Applications` · `get_site_info` · About 의 "앱 버전 복사")의 `15.x.x-develop` 거짓 값이 사라졌다 — 정상이며 되살리려고 `erpnext/hooks.py` 에 `setive_version` 을 넣지 않는다(금지 사항). 근거: [`docs/kb/KB-OPS-001`](docs/kb/KB-OPS-001_tenant_provisioning_deployment.md) §1.7.
 - upstream 리모트가 있다: `upstream` = `https://github.com/frappe/erpnext.git`. 태그 수급은 `git fetch upstream --tags`. **`version-16-hotfix` 는 추적하지 않는다** — 릴리스 태그와 계보가 갈라져 있고 컨테이너 이미지가 태그 단위로만 나온다.
-- 리베이스 전에 백업 브랜치를 만든다. 명명: `backup/develop-<직전상태>-<YYYYMMDD>` (예: `backup/develop-17dev-20260906`).
+- 리베이스 전에 백업 브랜치를 만든다. 명명: `backup/<브랜치>-<직전상태>-<YYYYMMDD>` — 지금은 `backup/setive-…` 다. 개명 이전에 만든 백업은 옛 접두사를 그대로 둔다 (실재: `backup/develop-17dev-20260906`).
 - **리베이스 후에는 `bench migrate` 가 필요하다.** 리베이스는 파일만 바꾸고 사이트 DB 스키마는 옛 태그에 머문다.
 
 | 작업 | 명령 |

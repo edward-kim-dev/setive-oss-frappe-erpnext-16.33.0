@@ -8,7 +8,7 @@ applies_to:
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-15
 verified_by: 포크·앱 코드 전수 실사 + 제도/상용API 웹 조사 9갈래 + 아키텍트·세무실무 2관점 심사 (2026-09-14)
-related: [KB-KOR-006, KB-OPS-002, ONT-ENT-002, KB-KOR-002, KB-KOR-003, KB-KOR-004]
+related: [KB-KOR-006, KB-KOR-007, KB-OPS-002, ONT-ENT-002, KB-KOR-002, KB-KOR-003, KB-KOR-004]
 ---
 
 # KB-KOR-005: 한국 현지화 로드맵 — 다음 구현 꼭지 선정 근거
@@ -146,6 +146,7 @@ python3 scripts/identifiers/selftest.py    # 앱 저장소에서. exit 0 이면 
 | 3 | 미커밋 변경 커밋 (포크 5건 + 앱 ko.po·translation_overrides) | 기준선 불명 |
 | 4 | Warehouse Type `Transit` after_migrate 보장 ([KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §10-2) | API 로 회사 생성 시 LinkValidationError |
 | 5 | SETIVE 가 부가세법 시행령 제68조⑤제1호 ERP설비 등록 대상인지 | 사업 구조 변경 — [KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md) §8 |
+| **6** | **SETIVE 사업자등록 보유 여부** | **2차(전자세금계산서) 전체가 막힌다. 팝빌 연동신청 폼이 사업자번호·업태·종목을 필수로 요구하고 공개 테스트키 우회도 차단돼 있다 — [KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md) §10·§11.1. 단 1차 M1~M4 는 영향 없음** |
 
 ### 6.1 확인 명령
 

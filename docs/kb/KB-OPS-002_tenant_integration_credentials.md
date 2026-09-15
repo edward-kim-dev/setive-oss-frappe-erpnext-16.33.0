@@ -8,8 +8,8 @@ applies_to:
   - frappe@v16
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-15
-verified_by: frappe/erpnext 코어 소스 확인(Bank Account · move_plaid_settings_to_doctype · company.json) + KB-OPS-001 배포 모델 대조
-related: [KB-OPS-001, KB-KOR-006, KB-KOR-005]
+verified_by: frappe/erpnext 코어 소스 확인(Bank Account · move_plaid_settings_to_doctype · company.json) + KB-OPS-001 배포 모델 대조 + 팝빌/볼타 환경분리 문서 확인(2026-09-15)
+related: [KB-OPS-001, KB-KOR-006, KB-KOR-007, KB-KOR-005]
 ---
 
 # KB-OPS-002: 테넌트 연계 설정·자격증명 계층
@@ -103,6 +103,15 @@ site_config 키가 없으면 → 무조건 sandbox
 ```
 
 **site_config 가 천장이고 DocType 은 그 아래로만 내려갈 수 있다.** 팝빌 SDK 의 `IsTest` 기본값이 **`false`(=운영)** 인 fail-open 구조이므로 SETIVE 층에서 반드시 뒤집어야 한다.
+
+### 5.2 환경의 형태가 벤더마다 다르다 (2026-09-15 추가)
+
+| 벤더 | 환경 분리 방식 |
+|---|---|
+| **팝빌** | 도메인·ServiceID 완전 분리 (`test.popbill.com`/`POPBILL_TEST` ↔ `popbill.com`/`POPBILL`). **데이터·인증서·연동회원이 이관되지 않는다** |
+| **볼타** | `xapi.bolta.io` 단일 도메인. **키 접두사(`test_`/`live_`)로만** 갈린다 |
+
+→ 자격증명 스키마의 '환경' 축을 벤더별로 다르게 잡아야 하고, 테넌트 프로비저닝 코드는 처음부터 **환경별 재실행 가능(idempotent)** 해야 한다. 팝빌에서는 테스트에서 만든 연동회원이 운영에 없으므로 **같은 온보딩을 두 번 돌리게 된다.**
 
 ---
 

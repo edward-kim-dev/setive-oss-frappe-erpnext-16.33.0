@@ -30,6 +30,9 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-KOR-003](./kb/KB-KOR-003_company_hook_tax_nts.md) | Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정 | 한국화 |
 | [KB-OPS-001](./kb/KB-OPS-001_tenant_provisioning_deployment.md) | 테넌트 프로비저닝·배포 파이프라인 (SETIVE Backend 참조) | 운영·배포 |
 | [KB-KOR-004](./kb/KB-KOR-004_nts_financial_statements.md) | 국세청 표준재무제표 리포트 (표준재무상태표·표준손익계산서·제조원가명세서) | 한국화 |
+| [KB-KOR-005](./kb/KB-KOR-005_localization_roadmap.md) | 한국 현지화 로드맵 — 다음 구현 꼭지 선정 근거와 3단계 계획 | 한국화 |
+| [KB-KOR-006](./kb/KB-KOR-006_etax_invoice_integration.md) | 전자세금계산서 연계 아키텍처 — 벤더 선정과 팝빌 파트너 단일키 모델 | 한국화 |
+| [KB-OPS-002](./kb/KB-OPS-002_tenant_integration_credentials.md) | 테넌트 연계 설정·자격증명 계층 — 무엇을 파일에 두고 무엇을 DB 에 두는가 | 운영·배포 |
 
 ### ONT — 온톨로지 입력물
 
@@ -37,6 +40,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 |---|---|---|
 | [ONT-CLS-001](./ontology/ONT-CLS-001_korean_industry_code_systems.md) | 국내 업종 코드체계 (KSIC · 국세청 업종코드 · 산재보험 사업종류) | 분류체계 |
 | [ONT-ENT-001](./ontology/ONT-ENT-001_inventory_cost_flow.md) | 재고·원가 흐름 개념 모델 (재고자산 · 매출원가 블록 · 제조원가) | 엔티티 |
+| [ONT-ENT-002](./ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) | 한국 세무 당사자·전표 분류 개념 모델 (식별번호 · 역할 · 분류축 · 시간) | 엔티티 |
 
 작성 규약은 [`docs/ontology/README.md`](./ontology/README.md)에도 별도로 있습니다.
 

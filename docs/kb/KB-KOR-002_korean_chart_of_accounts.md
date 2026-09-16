@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - frappe@v16
-verified_on: 2026-09-07
-verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판·324계정판 모두 Company 생성·측정·삭제 완료. 324판은 KB-KOR-003 E2E 에서 수행) + v16.33.0 리베이스 후 코어 심볼 재대조
+verified_on: 2026-09-16
+verified_by: 소스 확인 + 개발 컨테이너 실측 (321계정판·324계정판 모두 Company 생성·측정·삭제 완료. 324판은 KB-KOR-003 E2E 에서 수행) + v16.33.0 리베이스 후 코어 심볼 재대조. 2026-09-16 에 §4 계정 수·차트 md5·매핑표 블록 목록을 재계수해 정정(§12)
 related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 ---
 
@@ -52,10 +52,10 @@ related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 | **3000 자본** (6/23) | 3100 자본금 · 3200 자본잉여금 · 3300 자본조정 · 3400 기타포괄손익누계액 · 3500 이익잉여금 | — | 5분류 그대로 |
 | **4000 수익** (7/29) | 4100 매출액 | 4110 제품매출 · 4120 상품매출 · 4180 매출환입및에누리 · 4190 매출할인 | 4/12 |
 | | 4200 영업외수익 | — | 0/17 |
-| **5000 비용** (9/102) | 5100 매출원가 | — | 0/7 |
+| **5000 비용** (9/105) | 5100 매출원가 | — | 0/7 |
 | | 5200 제조원가 | 5210 재료비(3) · 5220 노무비(6) · 5230 제조경비(25) | 3/34 |
 | | 5300 판매비와관리비 | — | 0/44 |
-| | 5400 영업외비용 | — | 0/15 |
+| | 5400 영업외비용 | — | 0/18 |
 | | 5500 법인세비용 | — | 0/2 |
 
 차감계정은 별도 원장으로 둔다(대손충당금 5, 감가상각누계액 8, 상각누계액 4, 재고자산평가충당금 4, 매출환입·할인 4, 대손충당금환입 1). ERPNext 는 잔액 부호로만 구분하므로 재무제표(IFRS 템플릿)는 `account_category` 로 순액 집계한다.
@@ -129,15 +129,16 @@ Company 기본 필드 39개 중 21개가 채워졌다: 위 9개 + `round_off_acc
 
 법령 PDF 원본(`law.go.kr`)에서 추출한 코드표가 `scripts/coa/nts_codes.json` 이며 원본 sha256 이 `meta.source_pdf_sha256` 에 있다. 코드 체계는 **서식마다 1부터** 시작하므로 (서식, 코드) 쌍으로만 식별한다 — `is 44 ≠ mfg 44`. 적용 사업연도 2024 이후.
 
-### 7.2 형식 (schema 2)
+### 7.2 형식 (schema 3)
 
 ```
-meta            서식·개정일·출처·규약(amount_convention, aggregation, conventions)·미검증 목록·건수
-account_sets    산식에 쓰는 계정 집합 (GOODS/FG/WIP/RM 과 각 평가충당금, INV_ALL, COGS_ADJ, MFG_COST)
-computed_ops    opening_balance · closing_balance · movement · formula · ref · children · constant 정의
-computed        서식별 산식 행 (mfg 1·2·3·4·44~49, is 36~47·66·129·217·219 등 34행)
-reconciliation  항등식 3개 (매출원가 항등식, mfg 49 = is 44, 재고 순액 대사)
-accounts        계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role?, note?, unverified?}
+meta              서식·개정일·출처·규약(amount_convention, aggregation, conventions)·미검증 목록·건수·options
+account_sets      산식에 쓰는 계정 집합 (GOODS/FG/WIP/RM 과 각 평가충당금, INV_ALL, COGS_ADJ, MFG_COST)
+computed_ops      opening_balance · closing_balance · movement · formula · ref · children · constant 정의
+computed          서식별 산식 행 (mfg 1·2·3·4·44~49, is 36~47·66·129·217·219 등 34행)
+profile_overrides 업종 프로필별 accounts 오버레이 (현재 trading 의 5150 하나)
+reconciliation    항등식 4개 (매출원가 항등식, mfg 49 = is 44, 재고 순액 대사, 결산대체 완료)
+accounts          계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role?, note?, unverified?}
 ```
 
 핵심 규약만 적는다(전문은 파일의 `meta`).
@@ -146,7 +147,8 @@ accounts        계정번호 → {bs|is|mfg, label, sign?, contra?, level?, role
 - **sign**: 서식에 괄호(차감) 행이 있으면 그 행에 `sign:-1`(양수 표시), 없으면 모행에 그대로(순액). 재고자산평가충당금·상각누계액·매출환입·매출할인·대손충당금환입이 순액 반영 대상.
 - **level:parent**: 자식 행이 있는 상위 행에 직접 배정한 것(1217·1218 투자부동산, 5130 기타매출원가, 5211~5219 재료비). 행 값 = 직접 배정 + 자식 합.
 - **role:reconcile_only**: 서식 행에 배정하지 않는 영구재고 원장(5110·5120·5140·5141). 매출원가는 `computed` 산식(기초 + 당기 − 기말 − 타계정대체)으로 구하고, `assigned(is.35)+gl(5110)+gl(5120)+gl(5140)+gl(5141)+gl(5150)+net(MFG_COST) == is.35` 로 대사한다(`assigned(is.35)` 는 매출원가 아래 직접 배정 블록의 원장 합 — 5130 포함, 2026-09-08 §12 참조). Stock Entry 추가원가로 재공품·제품에 흡수되지 않은 제조원가(`net(MFG_COST)`)는 배부 대체분개를 하지 않으면 전액 당기 매출원가로 귀속된다.
-- **movement 의 상대계정 제외**: 재고 집합 내부 이동(원재료→재공품→제품)과 제조원가 흡수(대변)는 매입·타계정대체에서 빠지도록 `except_counter` 로 지정한다. 구현은 전표 단위로 상대계정을 구해야 한다(GL Entry `against` 필드는 다건 전표에서 부정확).
+- **movement 의 상대계정 제외**: 재고 집합 내부 이동(원재료→재공품→제품)과 제조원가 흡수(대변)는 매입·타계정대체에서 빠지도록 `except_counter` 로 지정한다. 상대계정은 **`GL Entry.against` 로 판정한다** — 코어가 재고 GL 라인의 against 에 상대계정을 직접 써 넣기 때문이다(2026-09-08 D-6, §12). 계정이 하나로 특정되지 않는 전표(Journal Entry 의 쉼표 나열 등)만 금액 비례 배분으로 폴백하고 경고를 남긴다([KB-KOR-004](./KB-KOR-004_nts_financial_statements.md) §4.3 · §6.1.1).
+- **meta.options**: 세무 판단이 갈리는 지점의 전환 스위치. 현재 `rm_other_transfer`(원재료 타계정대체를 mfg 48 에 합산할지 mfg 3 에서 차감할지) 하나이며 기본값은 `mfg48`. `load_map` 이 형식·허용값을 검증하고 오타는 즉시 throw 한다. 근거와 전환 절차는 [KB-KOR-004](./KB-KOR-004_nts_financial_statements.md) §4.4.
 
 ### 7.3 미검증 코드 (세무 검토 후 확정)
 
@@ -256,6 +258,13 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 
 ## 12. 이전 서술 정정
 
+### 2026-09-16
+
+- **§4 트리 구조 요약 표의 `5000 비용 (9/102)` 과 `5400 영업외비용 0/15`** — 실제는 `9/105` 와 `0/18` 입니다. 2026-09-06 커밋 `eba9d6a828` 이 단일 손익계정 3종(5422·5423·5452)을 5400 에 추가했는데 §4 표에 반영되지 않았습니다. 같은 문서 §1 의 원장 272 와도 어긋났습니다(80+35+23+29+105 = 272). 재계수해 고쳤습니다.
+- **§7.2 movement bullet "구현은 전표 단위로 상대계정을 구해야 한다(GL Entry `against` 필드는 다건 전표에서 부정확)"** — D-6(2026-09-08)으로 뒤집힌 문장이 남아 있었습니다. 엔진은 `against` 를 **권위로** 쓰고, 특정되지 않는 전표만 폴백합니다. 오히려 전표 단위 비례 배분이 부정확했던 것이 2026-09-08 결함의 원인이었습니다([KB-KOR-004](./KB-KOR-004_nts_financial_statements.md) §4.2).
+- **§7.2 블록 목록** — 최상위 키 `profile_overrides` 가 빠져 있었고 `reconciliation` 을 "항등식 3개" 라고 적었습니다(실제 4개 — 결산대체 완료 포함). `meta` 에 `options` 가 추가되면서 목록도 함께 고쳤습니다.
+- **매핑표 `meta.schema_version`** — 2 → **3** (2026-09-16, `meta.options` 신설). 값은 `nts_codes.MAP_SCHEMA_VERSION`(런타임 권위)과 `build_nts_map.py`(생성기) 두 곳에 있고, 한쪽만 올리면 `load_map` 이 throw 해 리포트 3종과 `apply` 가 전부 멈춥니다. 그래서 `validate_coa.py` 가 **엔진 소스에서 상수를 읽어**(`engine_contract()`) 매핑표와 대조합니다 — 검증기에 값을 베껴 두면 같은 함정이 하나 더 생기기 때문입니다. 허용 모드 목록(`RM_TRANSFER_MODES`)도 같은 방식으로 읽습니다.
+
 - 초판 프런트매터는 "확정본은 목록 노출·트리 렌더만 재확인"이라고 적었으나, 이후 확정본(321계정)으로 Company 생성·측정·삭제를 재수행했다. 실측값: Account 321(그룹 52·원장 269), 전부 KRW, 접미사 ` 1` 0건, 카테고리 없는 원장 0건, NestedSet 결함 0, Error Log 증가 0, `get_or_create_tax_group` → Asset `1171 부가세관련자산` / Liability `2150 예수금`, Company `default_*` 39개 중 19개 자동 매핑(수취 1131·지급 2111·현금 1111·은행 1115·단수차이 5490·매출원가 5120·매출 4111·재고 1155·재고조정 5140·입고미청구 2161·출고미청구 1160·감가상각누계액 1243·감가상각비 5311·건설중 1246·자산취득미청구 2163 + 코스트센터 3 + 기본창고). 삭제 후 잔여 0.
 
 - 런타임 실측 기록의 "296계정(그룹 49 + 원장 247)" 은 리뷰 반영 전 판이다. 확정본은 **321계정(그룹 52 + 원장 269)** 이며 Company 기본계정 21개 중 `write_off_account`·`bank_charges_account` 는 확정본에서 비게 된다(계정 삭제, 훅으로 이관).
@@ -273,7 +282,7 @@ docker compose -f $COMPOSE exec -T backend bench --site localhost execute \
 - **§9-3 의 "v16 은 실현 환차손익을 분리 필드로 기표한다"는 서술을 철회합니다.** 근거로 인용한 `erpnext/accounts/services/exchange_gain_loss.py` 가 16.33 에 없습니다(워킹트리에 `__pycache__` 만 남은 고아 디렉토리라 `ls` 로는 있는 것처럼 보임). 16.33 은 `exchange_gain_loss_account` 단일 계정만 씁니다(코어 13개 파일 참조). **회계 영향: 5422 외환차손익에 실현분 잔액이 실제로 쌓이므로 결산 대체가 필수입니다.** 초판의 "실현 환차손익도 단일 계정이 필요하다"는 판단이 16.33 에서는 옳았습니다.
 - **`Company.default_warehouse` 도 16.33 에 없습니다.** §6.2 실측 목록과 §12 첫 항목의 "기본창고" 는 17-dev 기준입니다. 16.33 `create_default_warehouses` 는 창고만 만들고 Company 필드를 채우지 않습니다(KB-KOR-003 §5·§12).
 - **`company.py` 라인 번호가 어긋났습니다** — `set_default_accounts` 741 → 623. 이 문서의 코어 인용을 함수명 기준으로 바꿨습니다. 남은 라인 번호(`exchange_rate_revaluation.py`, `sales_invoice_item.py`, `taxes_setup.py`, `install_fixtures.py`, `chart_of_accounts.py`)는 17-dev 시점 값이며 몇 줄씩 어긋날 수 있습니다. 확인은 `grep -n` 으로 합니다.
-- **§10 의 검증 명령은 리베이스 후에도 그대로 유효합니다.** 차트 파일 md5 `4a5b7e9873dc3eee93bffb046137836b`, 계정 324(그룹 52·원장 272) 재확인했습니다.
+- **§10 의 검증 명령은 리베이스 후에도 그대로 유효합니다.** 차트 파일 md5 `4a5b7e9873dc3eee93bffb046137836b`, 계정 324(그룹 52·원장 272) 재확인했습니다. **(md5 는 2026-09-07 커밋 `94dc249e28`(1160 의 17-dev 전용 account_type 제거)에서 `f6e03a38636b3ce60d028887ad41f471` 로 바뀌었습니다 — 2026-09-16 확인.)**
 - **2026-09-07: `1160 재고출고미청구` 의 `account_type` 을 제거했습니다.** `Stock Delivered But Not Billed` 는 ERPNext **17-dev 전용** 옵션이며 16.33.0 의 `Account.account_type` 32종에 없습니다. 지정한 채로 회사를 만들면 `ValidationError: 계정 유형 cannot be "Stock Delivered But Not Billed"` 로 생성 자체가 실패합니다(실측). 16.33 에는 대응하는 `Company.stock_delivered_but_not_billed` 필드도 이를 쓰는 코드도 없어, 계정은 남기고 타입만 비웠습니다. v17 이행 시 타입 부여를 검토합니다. `scripts/coa/validate_coa.py` 의 옵션 집합·필수 타입 목록에서도 제외했습니다.
 - **동일 사유로 `Company` 기본계정 3개가 16.33 에서 채워지지 않습니다** — `bank_charges_account`·`exchange_gain_account`·`exchange_loss_account` 는 17-dev 전용 필드입니다. 앱 `company_defaults.apply()` 가 `meta.has_field()` 로 건너뜁니다(KB-KOR-003). 따라서 §9-3 의 "v16 이 분리 필드를 우선 사용한다" 는 서술은 **17-dev 기준이었고 16.33 에는 해당하지 않습니다.** 16.33 에는 `exchange_gain_loss.py` 서비스 자체가 없고 단일 `exchange_gain_loss_account` 만 있으므로, `5422 외환차손익` 에는 실제로 잔액이 쌓이며 결산 대체가 필요합니다.
 - **2026-09-07: 매핑표에 소비자가 생겼습니다.** §7 의 국세청 표준재무제표 코드 매핑을 실제로 읽어 서식을 출력하는 리포트 3종을 앱에 구현했습니다 — [KB-KOR-004](./KB-KOR-004_nts_financial_statements.md). 그 과정에서 `5110`·`5120` 의 `reconcile_only` 를 풀고 `is 36`·`is 42` 에 `level:"parent"` 로 직접 배정했습니다. ERPNext 는 영구재고라 판매 시점에 실제 매출원가를 원장에 계상하는데 서식의 실지재고 산식과 어긋나 재무상태표가 대차평균을 잃었기 때문입니다(실측: 산식 39,928 vs 원장 253,760). 근거와 한계는 KB-KOR-004 §4.

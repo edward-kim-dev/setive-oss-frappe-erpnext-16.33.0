@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-07
-verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07)
+verified_on: 2026-09-16
+verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12)
 related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001]
 ---
 
@@ -272,6 +272,7 @@ Company Custom Field `setive_industry_profile`(Select `manufacturing` 기본 / `
 - 앱을 설치하기 전에 만든 회사가 있다 (KB-OPS-001 §5.1 3a 단계)
 - 훅이 실패한 채 회사가 만들어졌다 / 사용자가 기본계정·창고 계정·표준코드를 지웠다
 - 매핑표가 개정되어 `report_unmapped` 가 `stale=True` 를 보고한다 (이 경우는 `nts_codes.apply(force=True)`)
+- `report_unmapped` 가 `missing_count > 0` 을 보고한다 — 계정과목표에 계정이 추가됐는데 이 회사에는 없다. **`backfill` 은 계정을 만들지 않는다**(현재 이 앱에 계정 소급 생성 경로가 없다). 판단·설계는 [KB-KOR-004](./KB-KOR-004_nts_financial_statements.md) §8-4
 - 업종 프로필(§4.4)을 바꾼 뒤 훅이 돌지 않았다 — `backfill(company, switch=True)` 로 전환 규칙을 켠다(`--kwargs "{'company':'<회사명>','switch':True}"`). 기본(`switch=False`)은 빈 값만 채우는 비파괴 실행이라 사용자가 고른 다른 프로필 표준계정을 되돌리지 않는다. 표준코드는 어느 경우든 오버레이 대상(5150)만, 그것도 표준값일 때만 다시 쓴다(`reseed_overlay`, §7.2). `force=True` 로 전부 덮지 않는다(2026-09-08 리뷰).
 
 ```bash
@@ -289,7 +290,10 @@ $EXEC bench --site $SITE execute frappe.client.get_count \
 $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill \
   --kwargs "{'company':'$COMPANY'}"
 
-# 3. 표준코드 점검 — 기대: unmapped_count 0, stale False
+# 3. 표준코드 점검 — 기대: unmapped_count 0, missing_count 0, stale False
+#    missing 은 '매핑표에는 있는데 이 회사에는 없는 계정번호' 다. 계정과목표에 계정이 추가된 뒤
+#    만들어진 회사에는 있지만 그 전에 만들어진 회사에는 없다(코어 create_charts 는 회사 생성 시점에만
+#    돈다). 0 이 아니면 소급 생성 여부를 사람이 판단한다 — KB-KOR-004 §8-4
 $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_codes.report_unmapped \
   --kwargs "{'company':'$COMPANY'}"
 
@@ -330,7 +334,7 @@ $EXEC bench --site $SITE execute frappe.get_hooks \
 $EXEC /home/frappe/frappe-bench/env/bin/python -c \
   "from setive_erpnext_kr.korea.common import company, company_defaults, warehouses, taxes, nts_codes; print('OK')"
 
-# 계정 수 — 기대 324 (포크 차트 md5 4a5b7e9873dc3eee93bffb046137836b, 차트 커밋 eba9d6a8)
+# 계정 수 — 기대 324 (포크 차트 md5 f6e03a38636b3ce60d028887ad41f471, 차트 커밋 94dc249e — 2026-09-16 재확인)
 $EXEC bench --site $SITE execute frappe.client.get_count \
   --kwargs "{'doctype':'Account','filters':{'company':'$COMPANY'}}"
 
@@ -430,6 +434,11 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 ---
 
 ## 12. 이전 서술 정정
+
+### 2026-09-16
+
+- **§9 검증 명령의 차트 md5 `4a5b7e9873dc3eee93bffb046137836b`** — 낡은 값이었습니다. 2026-09-07 커밋 `94dc249e28`(1160 의 17-dev 전용 `account_type` 제거)에서 `f6e03a38636b3ce60d028887ad41f471` 로 바뀌었는데 기대값이 그대로 남아, 이 명령을 그대로 돌리면 정상인 차트가 불일치로 보였습니다. 현재 값으로 고쳤습니다(계정 수 324 는 그대로).
+- **§8 백필 절차의 표준코드 점검 기대값** — `unmapped_count 0, stale False` 만 적었습니다. `report_unmapped` 가 `missing`(매핑표에는 있으나 회사에 없는 계정번호)을 함께 돌려주도록 바뀌어 기대값에 `missing_count 0` 을 추가했습니다. 계정과목표에 계정이 추가된 뒤 만들어진 회사와 그 전에 만들어진 회사의 격차를 잡는 값입니다([KB-KOR-004](./KB-KOR-004_nts_financial_statements.md) §8-4).
 
 초판(2026-09-06)은 포크가 upstream `develop`(erpnext 17.0.0-dev) 위에 있는 상태에서 작성·실측됐습니다. 2026-09-06 리베이스로 코어가 `v16.33.0` 이 되면서 아래 서술이 사실과 달라졌습니다. **어느 것도 앱 코드의 동작 변경 때문이 아니라 코어 버전이 바뀌었기 때문입니다.**
 

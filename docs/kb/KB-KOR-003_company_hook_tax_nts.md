@@ -7,7 +7,7 @@ applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-16
-verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12) + 신원 필드는 코어 JSON 실측(company/customer/supplier field_order)·Custom Field 정의 정적 검산만 수행, 런타임 미검증(2026-09-16, §9.3)
+verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12) + 신원 필드는 코어 JSON 실측(company/customer/supplier field_order)·Custom Field 정의 정적 검산만 수행, 런타임 미검증(2026-09-16, §9.3) + 식별번호 체크섬은 scripts/identifiers/selftest.py 호스트 실행으로 검증 완료(2026-09-16)
 related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001, KB-KOR-008, KB-KOR-005, ONT-ENT-002]
 ---
 
@@ -343,22 +343,51 @@ bench --site $SITE set-config setive_brn_validation_policy block   # 기본은 w
 - 차단 예외는 전용 타입 `party_identity.BrnValidationError` 다. `frappe.ValidationError` 를 그대로 쓰면 하위 30여 종(`MandatoryError`·`LinkValidationError`·TDR 실행 중 차단 …)이 전부 같은 것으로 잡혀 **정책이 망가져 있어도 검증이 통과한다.**
 - Single DocType 이 아니라 `site_config` 인 이유: 거래처는 Company 에 속하지 않으므로(Customer/Supplier 에 `company` 필드가 없다) 회사별 정책은 적용 대상이 없고, Single 로 두면 그 DocType 이 DB 에 없는 동안 `get_single` 이 `DoesNotExistError` 를 내는데 그게 `validate` 훅 안이면 **사이트의 모든 거래처 저장이 죽는다.** KB-KOR-009 에서 `Korea Integration Settings` 가 실재하면 정책을 옮기고 `site_config` 는 상한으로 남긴다([KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) §5.1 과 같은 fail-safe).
 
-#### 체크섬은 이 모듈이 하지 않는다 — M1 선행
+#### 체크섬은 `identifiers.py` 가 소유한다 (M1 — 2026-09-16 완료)
 
-체크섬 검증은 `korea/common/identifiers.py` 소관이며 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M1 산출물**이다(frappe 비의존 순수 모듈 + `scripts/identifiers/selftest.py`). 2026-09-16 기준 **미착수**다(`grep -rniE 'checksum|사업자등록|luhn' --include='*.py'` → 앱·포크 전부 0건).
+체크섬·정규화는 [`korea/common/identifiers.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/identifiers.py) 소관이며 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M1 산출물**이다. `party_identity` 는 그 판정을 **정책**으로 옮기는 층이다 — 무엇을 막고 무엇을 경고할지, 어떤 값을 한국 식별번호로 볼지는 여기서 정한다.
 
-`party_identity` 는 seam 만 갖는다. **조용히 넘기지 않는다** — 엔진이 없으면 판정이 `미검증(unverified)` 이 되고 리포트가 **행마다** 그렇게 표시한다. 체크섬이 안 돌았는데 "이상 없음"을 보고하는 것은 [`CLAUDE.md`](../../CLAUDE.md) 가 `erpnext/regional/korea/` 금지의 근거로 지목한 바로 그 무증상 실패다.
+**frappe 비의존이 설계 제약이다.** `identifiers.py` 는 `import frappe` 를 하지 않고 앞으로도 하지 않는다. §4.1 이 M1 을 떼어낸 이유가 이것이다 — 체크섬은 컨테이너·bench 없이 호스트에서 검산 가능해야 하고, 그 제약이 유지보수 비용을 가른다. **이 저장소에서 사이트 없이 실행되는 유일한 검증이다.**
 
-seam 은 `try/except` 가 아니라 `importlib.util.find_spec` 을 쓴다. 이유 둘: ① `from pkg import missing` 는 `ModuleNotFoundError` 가 아니라 **`ImportError`** 를 내고 `exc.name` 이 부모 패키지로 잡혀 이름 기반 가드가 안 먹는다. ② 모듈이 존재하는데 내부 오타·순환참조로 ImportError 가 나도 똑같이 잡혀 **체크섬이 조용히 꺼진 채 배포된다.**
-
-M1 이 제공해야 하는 API:
-
-```python
-def validate_brn(digits: str) -> bool     # 사업자등록번호 10자리
-def validate_crn(digits: str) -> bool     # 법인등록번호 13자리
-def normalize_brn(value) -> str | None    # party_identity 의 임시 구현을 대체한다
-def normalize_crn(value) -> str | None
+```bash
+python3 scripts/identifiers/selftest.py     # 앱 저장소 루트에서. exit 0 이면 통과
 ```
+
+공개 API:
+
+| 함수 | 반환 |
+|---|---|
+| `validate_brn(value)` | `bool`. **체크섬 + 구분코드 실재 여부**. 하이픈 허용 |
+| `validate_crn(value)` | `bool`. 체크섬만 — CRN 구조 표는 ONT 에 없다 |
+| `brn_check_digit(value)` · `crn_check_digit(value)` | `int \| None`. 앞자리로 검증번호를 계산 |
+| `brn_quotient_term(d)` | `int`. 산식의 독립 항 `(d × 5) // 10`. 따로 검산 가능해야 해서 노출한다 |
+| `normalize_brn` · `normalize_crn` · `normalize_branch_code` | 정규형 또는 **원본 그대로** |
+| `digits_only(value)` | **ASCII** 숫자만 남긴 문자열 |
+
+> ⚠ **정규화 함수는 정규화할 수 없는 값을 `None` 이 아니라 원본 그대로 돌려준다.** `doc.tax_id = normalize_brn(doc.tax_id)` 가 자연스러운 호출인데 여기서 `None` 을 돌려주면 해외 거래처의 VAT 번호가 **저장 시점에 소실된다.** 보존이 기본값이어야 그 사고가 안 난다.
+
+두 가지는 산식 밖의 판단이며 둘 다 실무 사고에서 나왔다.
+
+- **`digits_only` 는 `str.isdigit()` 를 쓰지 않는다.** 그 함수는 유니코드 전각 숫자(`１`)와 위첨자(`²`)까지 `True` 다. 전각은 체크섬을 통과해 **전각 그대로 저장**되어 이후 조회·조인·세금계산서 XML 이 모두 어긋나고 §7.5 리포트도 잡지 못한다. 위첨자는 `int()` 에서 `ValueError` 를 던져 **거래처 저장이 500 으로 죽는다** — `validate` 훅 안이라 사용자에게는 원인 없는 서버 오류로 보인다. ASCII 숫자만 남기면 둘 다 `숫자 10자리 아님` 으로 떨어져 해외 식별자와 같은 취급을 받는다.
+- **구분코드(4~5번째 자리) `00` 을 거부한다.** [ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §1.1 의 구분코드 표는 **01~99 를 남김없이** 덮으므로 `00` 은 발급되지 않는다. 그런데 `0000000000` 과 `000-00-00000` 은 **체크섬이 맞고**(S=0 → check=0) 한국 ERP 이관에서 가장 흔한 placeholder 다. 거르지 않으면 §7.5 리포트에서 그 행이 **사라져 안전망이 거꾸로 작동한다.**
+  단 구조 검증은 구분코드까지만이다 — 세무서 일련번호(앞 3자리)는 ONT 에 유효 코드 표가 없어 검증하지 않는다. **없는 표를 지어내지 않는다.** 완전한 실재 확인은 국세청 상태조회(M4) 몫이다.
+
+**임포트를 `try/except` 로 감싸지 않는다.** 같은 앱·같은 패키지 안의 우리 모듈이므로 부재는 런타임 조건이 아니라 **빌드 오류**다. 감싸면 모듈 내부의 오타·순환참조까지 함께 삼켜 체크섬이 조용히 꺼진 채 배포된다 — 이 앱의 관례도 "예외를 삼키지 않는다" 이다(`nts_codes` 모듈 docstring).
+
+산식은 [ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §1.1·§1.2 를 따른다. 두 지점이 Luhn 과 달라 옮겨 적을 때 틀리기 쉽다.
+
+- **사업자등록번호**: 9번째 자리가 **두 번** 쓰인다 — 가중합의 `w[8]=5` 로 한 번, `(d[8] × 5) // 10` 몫 항으로 또 한 번. 이 항을 빠뜨리면 검증번호가 10개 중 약 절반에서만 우연히 맞는다.
+- **법인등록번호**: 곱이 10 을 넘어도 **자릿수를 분해하지 않는다.**
+
+selftest 는 순환 검증을 피하려고 다섯 갈래로 나눴다 — ① 손계산 벡터(가중합·몫 항·검증번호를 중간값까지 단언) ② 구조 속성(앞자리마다 검증번호 10개 중 정확히 1개만 통과, `validate` 와 `check_digit` 교차검증) ③ 독립 작성한 참조 구현과의 차분 대조 **144,900건** ④ 정규화·경계값(비-ASCII·구분코드 00 포함) ⑤ `fixture_company.py` 의 BRN/CRN 상수를 **파일에서 읽어** 검산.
+
+> ⚠ **차분 코퍼스는 자릿수 커버리지를 스스로 점검한다.** 초판은 일련번호 4자리를 `range(10)` 으로 돌면서 `:04d` 로 찍어 앞 3자리가 전 케이스에서 `0` 으로 고정됐고, 그 결과 `BRN_WEIGHTS[5]·[6]·[7]` 이 **한 번도 발현하지 않았다** — 실번호의 50% 를 오판하는 가중치 변조가 selftest 를 통과했다(뮤테이션으로 실증). 지금은 순회 보폭을 실측으로 고르고 10자리 전부에서 0~9 가 나오는지 단언한다. 건수가 아니라 **커버리지**가 이 절의 유일한 실패 모드다.
+>
+> fixture 파일이 없으면 **건너뛰지 않고 실패**한다. 일부 가중치 변조를 ⑤ 만 잡는 구간이 있어, 파일을 옮기면 커버리지가 말없이 사라지는데 exit 는 0 이 되기 때문이다.
+
+뮤테이션 9종(가중치 변조 3 · 몫 항 `//10`→`%10` · 바깥 `%10` 제거 · CRN 가중치 순서 · `digits_only` 유니코드 · 구분코드 게이트 제거 · 정규화 `None` 반환)을 사본에 가해 **전부 exit≠0 으로 죽는 것**을 확인했다(2026-09-16).
+
+주민등록번호는 `identifiers.py` 에 넣지 않았다 — 아래 참조.
 
 #### 주민등록번호를 1차에 만들지 않는다 — 사람 승인 대상
 
@@ -553,6 +582,13 @@ SITE=localhost
 EXEC="docker compose -f $COMPOSE exec -T backend"
 PY=/home/frappe/frappe-bench/env/bin/python
 
+# ── 사이트 없이 지금 돌아가는 유일한 검증 ──────────────────────────────
+# 체크섬 산식. frappe 비의존이라 호스트에서 그대로 실행된다. exit 0 이면 통과.
+cd ../setive_erpnext_kr && python3 scripts/identifiers/selftest.py; echo "exit=$?"
+# 2026-09-16 실행 결과: 손계산 벡터 · 구조 속성 10종 · 차분 145,001건(10자리 전부 0~9 발현) ·
+#   정규화/경계 (비-ASCII·구분코드 00 포함) · fixture 상수 5건 → 전부 통과, exit 0
+
+# ── 아래부터는 사이트가 필요하다 ──────────────────────────────────────
 # 0. 선행 — 스택 기동 + 스키마 정합. 사람 승인 사항이다(§10-1)
 make up-dev
 $EXEC bench --site $SITE migrate
@@ -586,9 +622,6 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_report.insta
 #      반영 여부는 아래로 확인한다.
 $EXEC bench --site $SITE execute frappe.client.get_value \
   --kwargs "{'doctype':'Report','filters':{'name':'Korea Etax Ineligible Parties'},'fieldname':['modified','report_type','module']}"
-
-# 6. 체크섬 엔진 유무 — M1 착수 전에는 False 가 정답이다
-$EXEC $PY -c "from setive_erpnext_kr.korea.common import party_identity as p; print(p.checksum_engine_available())"
 
 # 7. 정규화 — 하이픈 입력이 숫자만 남는가 (컨테이너·bench 없이도 확인 가능한 순수 함수)
 $EXEC $PY -c "from setive_erpnext_kr.korea.common import party_identity as p; \
@@ -658,6 +691,20 @@ done
 ---
 
 ## 12. 이전 서술 정정
+
+### 2026-09-16 (3) — M1 완료에 따른 정정
+
+- **"체크섬은 `identifiers.py` 소관이며 미착수다" 는 해소됐습니다.** 같은 날 M1 을 착수해
+  `korea/common/identifiers.py` 와 `scripts/identifiers/selftest.py` 를 만들었고 selftest 는
+  호스트에서 exit 0 입니다. 이에 따라 `party_identity` 의 `importlib.util.find_spec` seam,
+  `checksum_engine_available()`, 판정값 `BRN_UNVERIFIED`("미검증") 를 **전부 제거**하고
+  하드 임포트로 바꿨습니다. seam 은 모듈 부재를 관측 가능하게 드러내려던 장치였는데,
+  모듈이 실재하는 지금은 **도달 불가능한 분기**로 남아 오히려 오해를 만듭니다.
+  리포트의 "미검증" 머리말·색상 분기와 fixture 의 조건부 기대도 함께 걷어냈습니다.
+- **fixture 의 "체크섬 오류 거래처 1건" 이 이제 실제로 검증됩니다.** 엔진이 없던 동안에는
+  판정이 전부 `미검증` 이라 BADBRN 거래처가 리포트에 잡히지 않았고, 그래서 착수 지시의
+  "체크섬 오류도 결측과 구분해 표시" 요구가 미검증 상태였습니다. `assert_report` 에
+  체크섬 오류 필터 단언을 추가했습니다.
 
 ### 2026-09-16 (2) — 신원 필드 추가에 따른 정정
 

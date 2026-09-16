@@ -93,8 +93,8 @@ related: [KB-KOR-006, KB-KOR-007, KB-KOR-008, KB-OPS-002, KB-OPS-003, ONT-ENT-00
 
 | # | 산출물 | 규모 | 상태 (2026-09-16) |
 |---|---|---|---|
-| M1 | `korea/common/identifiers.py` — 사업자(10)·법인(13) 등록번호 체크섬. **frappe 비의존 순수 모듈** + `scripts/identifiers/selftest.py` | 1~2일 | **미착수 — M2 의 체크섬이 여기에 막혀 있다** |
-| M2 | Company 11 · Customer/Supplier 12 신원 필드 + **"발급 불가 거래처" 리포트** | 3~5일 | **코드 완료 · 런타임 미검증** → [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §7.4·§7.5 |
+| M1 | `korea/common/identifiers.py` — 사업자(10)·법인(13) 등록번호 체크섬. **frappe 비의존 순수 모듈** + `scripts/identifiers/selftest.py` | 1~2일 | **완료·검증됨 (2026-09-16)**. selftest 호스트 실행 exit 0 — 이 로드맵에서 **사이트 없이 검증된 유일한 항목** |
+| M2 | Company 11 · Customer/Supplier 12 신원 필드 + **"발급 불가 거래처" 리포트** | 3~5일 | **코드 완료 · 런타임 미검증**(체크섬 판정만 M1 로 검증됨) → [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §7.4·§7.5 |
 | M3 | 테넌트 설정·자격증명 계층 → [KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) | 2~3일 | 설계 정정 완료(§13), 구현 미착수 |
 | M4 | 국세청 사업자등록 상태조회 연동 (무료 공공 API) | 3~4일 | **스키마만 준비** — `Korea Party Tax Status` DocType 신설, 조회 연동 미착수 |
 | M5 | 전표 세무 분류 축 (증빙유형 × 과세유형 × 불공제 버킷) | 5~8일 | 미착수 |
@@ -105,6 +105,10 @@ related: [KB-KOR-006, KB-KOR-007, KB-KOR-008, KB-OPS-002, KB-OPS-003, ONT-ENT-00
 > ⚠ **"런타임 미검증" 의 뜻**: 2026-09-16 기준 개발 스택에 컨테이너가 하나도 없고(`docker compose ps` → 0행),
 > §6-1 의 `bench migrate` 미실행도 해소되지 않았다. M2 코드는 작성·정적 검산됐으나 **사이트에서 한 번도 돌지 않았다.**
 > 실행 가능한 검증 명령은 [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §9.3 에 있다.
+>
+> **예외는 M1 이다.** §4.1 이 frappe 비의존으로 떼어낸 덕분에 `python3 scripts/identifiers/selftest.py` 가
+> 호스트에서 그대로 돌고 2026-09-16 실행에서 exit 0 이다 — 손계산 벡터 · 구조 속성 · 참조 구현 차분
+> 약 4.9만 건 · 정규화 경계 · fixture 상수 동기. 제약 하나가 검증 가능성을 통째로 바꾼 사례다.
 
 > **필드 수 정정**: 초판은 "Company 8 · Customer/Supplier 11" 이었다. 실제 구현은 **Company 11 · Customer/Supplier 각 12**,
 > 신규 합계 **35**(기존 9 포함 44)다. 차이의 원인은 셋이다 — ① 초판 견적이 Company 의 레이아웃 필드(Column Break·섹션 닫기)를 세지 않았다

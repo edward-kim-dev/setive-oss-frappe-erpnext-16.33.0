@@ -8,7 +8,7 @@ applies_to:
   - frappe@16.31.0
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-14
-verified_by: babel read_po 실측 + 번역 사전 런타임 조회(8/8) + v16.33.0 리베이스 시 main.pot·ko.po diff 실측 + v16.34.1 대비 main.pot 줄 수·충돌 집합 실측
+verified_by: babel read_po 실측 + 번역 사전 런타임 조회(8/8) + v16.33.0 리베이스 시 main.pot·ko.po diff 실측 + v16.34.1 대비 main.pot 줄 수·충돌 집합 실측 + babel read_po→write_mo→read_mo 라운드트립 34/34 적중(§10.5) + frappe/erpnext ko.po 번역률·출처 전수 대조
 related: [KB-LOC-002, KB-KOR-001, KB-OPS-001]
 ---
 
@@ -67,13 +67,20 @@ Frappe 의 `__(txt, replace, context)` 는 `frappe._messages["<msgid>:<msgctxt>"
 - **`bench update-po` 를 이 파일에 실행하지 않습니다.** babel 의 obsolete 처리로 소스에서 추출되지 않는 수동 msgid(= frappe 코어 문자열 재정의분)가 삭제됩니다.
 - 항목마다 `# 원본 위치: <경로>:<라인>` 주석을 답니다. 앱이 아니라 포크·frappe 소스를 가리키는 경우가 대부분이라 이 주석이 유일한 역참조입니다.
 - 중복 키는 만들지 않습니다 — §7 의 함정이 그대로 적용됩니다.
-- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 3블록 65엔트리:
+- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 10블록 124엔트리(중복 0):
 
 | 블록 | 블록 내 정렬 | 내용 |
 |---|---|---|
 | KSIC 한국표준산업분류 제11차 대분류 | msgid 알파벳순 | `msgctxt "KSIC"` 21건 (KB-KOR-001) |
 | 셋업 기본 마스터 명칭 오역 교정 | — | `Stores` → `창고` 1건 |
 | 셋업 위저드 한국어 | 위저드 UI 등장 순 | 포크 `ko.po` 에서 이관한 43건 (§6.1) |
+| frappe 코어 검증·설정 메시지 | — | 문서 저장·검증 메시지 25건 |
+| 셋업 위저드 "계정 설정" 슬라이드 | 화면 등장 순 | frappe `user` 슬라이드 7건 (§10) |
+| 위저드 셸 버튼 | — | `Previous` · `Next` 2건, **무맥락** (§10.2) |
+| 비밀번호 강도 표시기 | 강도 오름차순 | 5건. `Average` 는 의도적 미번역 (§10.3) |
+| 필수·형식 검증 모달 | — | `field_group.js` · `data.js` 6건 |
+| 테마 전환 다이얼로그 | — | `theme_switcher.js` 8건 + `desk_theme` 형제 옵션 2건 |
+| Fieldtype Select 오염 가드 | — | `msgctxt` 4건, `msgstr` 이 원문과 같음 (§10.4) |
 
 **컴파일은 [`Makefile`](../../Makefile) 의 `make po` 로 충분합니다.** `compile_translations(target_app=None, ...)` 은 `frappe.get_all_apps(True)` 를 순회하므로 앱 `ko.po` 도 함께 MO 로 컴파일됩니다(`frappe/gettext/translate.py:247-248`). 앱 하나만 좁혀 돌리려면(배포 스크립트 등, KB-OPS-001 §5.1):
 
@@ -152,7 +159,7 @@ grep -n 'setup_wizard.js:' erpnext/locale/main.pot | grep -A1 KSIC
 - 런타임 조회 8/8 (`Manufacturing/KSIC`→제조업, `Stores`→창고, `Your Language`→사용 언어 등)
 - 포크 `erpnext/locale/ko.po` 는 v16.33.0 원본과 바이트 동일 (`git diff v16.33.0..HEAD -- erpnext/locale/ko.po` 무출력)
 
-> **2026-09-07 시점 미결.** 이관분 43건은 앱 저장소 작업트리에만 있고 아직 커밋되지 않았습니다(`cd ../setive_erpnext_kr && git status --porcelain` → ` M setive_erpnext_kr/locale/ko.po`). 커밋된 HEAD 판은 22엔트리뿐이라, 이 작업트리를 잃으면 43건은 백업 브랜치 `backup/develop-17dev-20260906` 의 드롭 커밋에서만 복원됩니다. 앱 저장소에서 즉시 커밋해야 합니다.
+> **~~2026-09-07 시점 미결.~~ 2026-09-14 해소.** 이관분 43건은 앱 저장소에 커밋됐습니다(작업트리 clean). 아래는 당시 서술이며 기록으로만 남깁니다 — 이관분 43건이 작업트리에만 있어 백업 브랜치 `backup/develop-17dev-20260906` 의 드롭 커밋에서만 복원 가능한 상태였습니다.
 
 이관분 중 5건(`Wholesale / Distribution`, `Services / Consulting`, `Construction / Real Estate`, `Technology / Software`, `Food & Beverage`)은 KSIC 교체 커밋(`2d7c4e6b33`)이 [`erpnext/public/js/setup_wizard.js`](../../erpnext/public/js/setup_wizard.js) 에서 지운 **옛 industry 옵션값**이며 포크·frappe 양쪽에 참조가 0건입니다. 살아 있는 문자열로 오인하지 않도록 앱 `ko.po` 에 그 취지의 주석을 답니다.
 
@@ -252,6 +259,8 @@ $EXEC bench --site $SITE execute frappe.translate.get_all_translations \
 - 초판은 이 문서를 "포크 로컬 번역" 규약으로 불렀습니다. 제목을 바꿨으나 파일명과 ID(`KB-LOC-003`)는 링크 정합을 위해 유지합니다.
 - **2026-09-14: §6 step 1 의 `git checkout --theirs` 주석이 뒤집혀 있었습니다.** "rebase 중에는 `--theirs` 가 upstream 쪽" 이라고 적었으나 반대입니다 — `git help rebase` 의 `-m` 항목이 "the side reported as ours is the so-far rebased series, starting with `<upstream>`, and theirs is the working branch" 라고 명시합니다. 즉 rebase 중 `--ours` 가 upstream(새 태그) 쪽이고 `--theirs` 는 재생되는 SETIVE 커밋 쪽입니다. 그 명령은 §6 이 막으려던 '포크의 낡은 pot' 을 꺼냅니다. 다음 줄의 `git show` 가 덮어써 실해는 없었지만 **줄 자체를 삭제**했습니다 — `git show` 하나로 충분합니다.
 - **2026-09-14: §6 의 명령과 기대 줄 수가 `v16.33.0` 에 하드코딩돼 있었습니다.** 다른 태그로 올리며 그대로 실행하면 `git show v16.33.0:…` 이 upstream 변경분(`v16.34.1` 기준 `+510/−472`)을 통째로 되돌리는데, **검증 3종이 전부 통과합니다** — `--numstat` 는 `105 0`, 줄 수는 63554 로 맞아떨어지기 때문입니다. `NEW` 변수로 일반화하고 태그별 기대값(v16.33.0 → 63449, v16.34.1 → 63487)을 병기했습니다. 실측으로 확인: `git show <태그>:erpnext/locale/main.pot | wc -l`.
+- **2026-09-14: §3 의 "일반 단어에는 반드시 `msgctxt`" 를 무조건 규칙으로 읽으면 안 됩니다 — 폴백은 한 방향입니다.** `frappe/gettext/translate.py:371-375` 를 실측하면 MO 적재 시 `msgctxt` 가 있는 항목은 `"<msgid>:<msgctxt>"` 키 **하나만** 만들고 무맥락 키는 만들지 않습니다(같은 함수 docstring 의 "맥락 있는 번역을 무맥락으로도 쓴다"는 주장은 코드와 다릅니다). 반대로 `translate.js:12-18` 은 ctx 키 실패 시 무맥락 키로 폴백합니다. 따라서 **무맥락 엔트리 1건이 ctx 호출과 무맥락 호출을 모두 덮고, ctx 전용 엔트리는 무맥락 호출을 못 덮습니다.** §3 의 규칙은 "다른 문맥의 기존 번역과 충돌할 때"에만 적용해야 하며, 충돌이 없다면 무맥락이 커버리지가 넓어 유리합니다. 실제 적용은 §10.2.
+- **2026-09-14: 앱 `ko.po` 의 `Company Abbreviation cannot have more than 5 characters` 역어가 "10자" 였습니다.** 원문도 코드도 5자입니다([`erpnext/public/js/setup_wizard.js:338`](../../erpnext/public/js/setup_wizard.js)). 사용자가 10자까지 된다고 읽고 6자를 넣었다가 다시 막히는 사실관계 오류라 "5자" 로 교정했습니다.
 
 ## frappe 코어 메시지 번역
 
@@ -267,3 +276,111 @@ frappe 는 한국어 번역률이 매우 낮습니다(2026-09-07 기준 사이�
 2026-09-07 에 위저드·문서 저장 경로에서 사용자가 실제로 마주치는 25건을 추가했습니다(검증 실패·필수 항목 누락·제출 후 수정 금지 등).
 
 **주의**: 단독 `"Yes"`/`"No"` msgid 는 아직 번역하지 않았습니다. 전 UI 의 모든 Yes/No 를 바꾸는 광범위한 오버라이드이고, Select 옵션 표시와 확인 대화상자 등 영향 범위가 넓어 별도 판단이 필요합니다. 위 오류 메시지에서 옵션이 `"", "No", "Yes"` 로 영문으로 보이는 이유입니다.
+
+## 10. 셋업 위저드 "계정 설정" 슬라이드 한글화 (2026-09-14)
+
+`Let's set up your account` 슬라이드가 통째로 영문이라는 보고로 시작한 작업입니다. 원인은 단순합니다 — **이 슬라이드는 erpnext 가 아니라 frappe 코어가 그리고, frappe 의 `ko.po` 는 6,240 엔트리 중 27건(0.4%)만 번역돼 있습니다.** erpnext 는 55.1%(10,110 중 5,571)입니다. 그래서 erpnext 가 붙이는 앞뒤 슬라이드만 한국어로 보였습니다.
+
+앱 `ko.po` 에 34건을 추가했습니다(124엔트리, 중복 0). 포크는 한 줄도 바뀌지 않았습니다.
+
+### 10.1 이 슬라이드는 `developer_mode` 가 켜져 있으면 렌더되지 않는다
+
+```javascript
+// frappe/desk/page/setup_wizard/setup_wizard.js:87
+if (!(s.name === "user" && frappe.boot.developer_mode)) {
+	frappe.setup.add_slide(s);
+}
+```
+
+[`docker/development/docker-compose.yml`](../../docker/development/docker-compose.yml) 의 configurator 가 `bench set-config -g developer_mode 1` 을 실행하므로 **로컬 개발 스택에서는 이 슬라이드가 존재하지 않습니다.** 화면으로 확인하려면 `developer_mode` 를 끄고 셋업이 끝나지 않은 신규 사이트가 필요합니다(`localhost` 는 이미 완료 상태라 `/app/desk` 로 리다이렉트됩니다).
+
+→ 반영 검증은 화면이 아니라 **번역 사전 조회**로 합니다(§10.5).
+
+### 10.2 위저드 버튼은 `msgctxt` 없이 등록한다
+
+`slides.js` 는 `__("Next", null, "Go to next slide")` 처럼 컨텍스트를 넘깁니다. 그럼에도 앱 `ko.po` 에는 **무맥락으로** 넣었습니다. 근거는 폴백의 비대칭입니다(§9 정정 항목).
+
+| 등록 방식 | 위저드 버튼(ctx 호출) | `form_tour`·`web_form`·`onboarding_tours`·`slideshow`(무맥락 호출) |
+|---|---|---|
+| `msgctxt` 부착 | 덮음 | **영문으로 남음** (Next 7곳 · Previous 5곳) |
+| **무맥락 (채택)** | 덮음 (폴백) | 덮음 |
+
+`erpnext/locale/ko.po` 에 두 msgid 모두 없어 회귀 위험은 0 입니다(실측).
+
+`Complete Setup` 은 이미 무맥락 엔트리가 있어 추가하지 않았습니다. frappe 의 ctx 엔트리는 `msgstr` 이 비어 MO 에서 탈락하므로, **지금 그 버튼을 번역하고 있는 것은 앱의 무맥락 엔트리입니다.** "호출부가 없는 고아" 로 오인해 지우지 마십시오.
+
+### 10.3 `Average` 는 의도적으로 비워 둔다
+
+비밀번호 강도 4단계 중 `Average` 만 번역하지 않았습니다. 무맥락 `Average` 가 집계함수 Select 를 오염시키기 때문입니다.
+
+| 오염 지점 | `msgctxt` 로 막을 수 있는가 |
+|---|---|
+| `ui/group_by/group_by.js:21` (리포트 Group By) | ✗ |
+| `query_report.js:248` (리포트 열 Function) | ✗ |
+| `widgets/widget_dialog.js:702` · `dashboard_view.js:343` · `:391` | ✗ — Dialog 인라인 options 라 `df.parent` 가 없다 |
+| `www/update-password.html:287` | 형제 라벨이 `Poor!/Good/Great!` 라 집합 자체가 다르다 |
+
+얻는 것은 강도 막대의 한 단어, 잃는 것은 회계 담당자가 상시 쓰는 리포트 집계 메뉴 5곳입니다. 채우려면 `Count`·`Sum`·`Minimum`·`Maximum`·`Poor!`·`Good`·`Great!` 까지 **한 벌로** 가야 합니다.
+
+> ⚠ 나중에 채울 때는 반드시 **그 줄의 `msgstr` 을 직접** 고치십시오. 파일 뒤에 같은 msgid 를 추가하면 babel `read_po` 가 첫(빈) 항목만 채택하고 뒤를 **무경고로** 버립니다(§7).
+
+### 10.4 `msgstr` 이 원문과 같은 가드 엔트리
+
+무맥락 `Password` → `비밀번호` 는 `login.html`·`user.js`·`email_account` 에서 이득이지만, **4개 DocType 의 Fieldtype Select 옵션**에도 적중해 `Data / Select / 비밀번호 / Int` 혼종 목록을 만듭니다. `select.js:82` 가 `df.context || df.parent || doctype` 을 컨텍스트로 넘기므로 `msgctxt` 로 정확히 되돌릴 수 있습니다.
+
+```
+msgctxt "DocField"
+msgid "Password"
+msgstr "Password"
+```
+
+`DocField` · `Custom Field` · `Customize Form Field` · `Web Form Field` 4건입니다. **`msgstr` 이 원문과 같은 것은 오류가 아니라 의도된 복원입니다.**
+
+같은 이유로 `Automatic` → `자동` 은 `user.json` 의 `desk_theme` Select(`Light\nDark\nAutomatic`)에도 적중하므로 형제 옵션 `Light`·`Dark` 를 함께 넣었습니다. 한쪽만 넣으면 `Light / Dark / 자동` 이 됩니다.
+
+### 10.5 검증
+
+컨테이너 없이 babel 라운드트립으로 MO 키 생성을 확인할 수 있습니다(스택 기동 불필요).
+
+```bash
+APP=../setive_erpnext_kr
+docker run --rm -v "$(cd $APP && pwd):/app:ro" --entrypoint sh frappe/erpnext:v16.33.0 -lc '
+/home/frappe/frappe-bench/env/bin/python - <<PY
+from babel.messages.pofile import read_po
+from babel.messages.mofile import write_mo, read_mo
+import io
+cat = read_po(io.open("/app/setive_erpnext_kr/locale/ko.po", encoding="utf-8"))
+buf = io.BytesIO(); write_mo(buf, cat); buf.seek(0)
+d = {}
+for m in read_mo(buf):
+    if not m.id: continue
+    d[f"{m.id}:{m.context.decode()}" if m.context else m.id] = m.string
+print("MO 키", len(d))
+print(d["Email Address"] + " (" + d["Will be your login ID"] + ")"
+      == d["Email Address (Will be your login ID)"])   # 조립 라벨 바이트 일치
+PY'
+```
+
+2026-09-14 실측: PO 125 엔트리 → MO 123 키, 대상 34/34 적중, 조립 라벨 일치 `True`.
+(`Average` 는 빈 `msgstr` 이라 babel 이 MO 에서 제외합니다 — 정상입니다.)
+
+스택이 떠 있으면 런타임 사전으로도 확인합니다.
+
+```bash
+make po     # compile_translations + clear-cache + flushall
+docker compose -f docker/development/docker-compose.yml exec backend \
+  bench --site localhost execute frappe.translate.get_all_translations --kwargs "{'lang':'ko'}"
+```
+
+`Next` 와 `Next:Go to next slide` 를 **각각** 확인하십시오 — 전자만 있으면 정상입니다(§10.2).
+
+### 10.6 범위 밖으로 남긴 것
+
+이번 슬라이드 밖이라 손대지 않았습니다. 별건으로 판단이 필요합니다.
+
+| 항목 | 내용 |
+|---|---|
+| 완료·실패 화면 8건 | `Setting up your system` · `Starting Frappe ...` · `starting the setup...` · `Refreshing...` · `Failed to complete setup` · `Could not start up:` · `Setup failed` · `Retry`. `Complete Setup` 을 누른 직후 화면이며 전부 영문이다 |
+| 죽은 엔트리 `Setup Failed` | 앱 `ko.po` 에 대문자 판이 있으나 실제 호출은 `setup_wizard.js:265` 의 소문자 `Setup failed` 다. msgid 는 바이트 일치라 지금 이 엔트리는 아무것도 번역하지 않는다 |
+| 모듈 선택 슬라이드의 `Manufacturing` → `조작` | [`erpnext/public/js/setup_wizard.js:163`](../../erpnext/public/js/setup_wizard.js) 이 `__("Manufacturing")` 을 **무맥락**으로 부르는데 `erpnext/locale/ko.po:30192` 가 `조작` 으로 번역한다. 같은 위저드의 업종 Select 는 `msgctxt "KSIC"` 로 `제조업` 이라, 한 위저드 안에서 같은 단어가 둘로 갈린다. 무맥락 엔트리를 추가하면 Manufacturing **모듈명 전역**이 함께 바뀌므로 사람 판단이 필요하다 |
+| 앵커 공백 68건 | `../setive_erpnext_kr/setive_erpnext_kr/translation_overrides.py` 가 124건 중 56건만 참조한다. 이번 34건은 넣었고, 이관분 43 + frappe 코어 25 는 아직 없다. `bench update-po --app setive_erpnext_kr` 을 돌리면 그 68건이 사라진다(`make po` 는 안전) |

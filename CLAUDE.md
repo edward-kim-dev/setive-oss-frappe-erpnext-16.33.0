@@ -139,7 +139,13 @@ SITE=localhost
 | 번역 컴파일 | `make po` |
 | 지역 기본값 + 번역 | `make lang` |
 | 캐시 초기화 | `make clean` |
-| 스택 기동 | `docker compose -f $COMPOSE up -d` |
+| 스택 기동 (운영 유사) | `make up` — `developer_mode=0` |
+| 스택 기동 (개발자 모드) | `make up-dev` — `developer_mode=1` |
+| 중지 / 재시작 / 초기화 | `make down` / `make restart` / `make reset` |
+
+`make up` 과 `make up-dev` 는 `developer_mode` 만 다르다. **셋업 위저드의 "계정 설정" 슬라이드는 개발자 모드에서 렌더되지 않는다** — `frappe/desk/page/setup_wizard/setup_wizard.js:87` 이 목록에서 제외한다. 위저드 전 과정을 확인하려면 `make up` 을 쓴다. 근거는 [`docs/kb/KB-DEV-001`](docs/kb/KB-DEV-001_makefile_automation.md) §2.1.
+
+`docker compose up` 을 직접 쓰면 `DEVELOPER_MODE` 가 없어 기본값 1(개발자 모드)로 뜬다.
 
 ### 컨테이너를 재생성한 뒤에는 앱을 다시 pip 설치해야 한다
 

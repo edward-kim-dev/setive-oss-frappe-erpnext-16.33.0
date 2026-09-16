@@ -76,6 +76,14 @@ services:
       #   여기에 PYTHONPATH 가 없으면 apps.txt 에 있는 앱을 import 하지 못해
       #   bench new-site 를 포함한 **모든 bench 명령**이 ModuleNotFoundError 로 실패한다.
       PYTHONPATH: /home/frappe/frappe-bench/apps/setive_erpnext_kr
+      # 기동 모드. Makefile 의 `make up`(0) / `make up-dev`(1) 이 주입한다.
+      # 직접 `docker compose up` 을 쓰면 기본값 1(개발자 모드)이다.
+      #   0 → 셋업 위저드의 "계정 설정" 슬라이드가 보이고, 셋업 완료 시 관리자 User 가
+      #       생성되며 그 계정으로 로그인이 전환된다 (운영과 같은 흐름)
+      #   1 → 위 슬라이드가 슬라이드 목록에서 제외되고 Administrator 로 남는다
+      #       (frappe/desk/page/setup_wizard/setup_wizard.js:87, setup_wizard.py:209)
+      #       대신 DocType 편집분이 앱 폴더에 JSON 으로 기록된다
+      DEVELOPER_MODE: ${DEVELOPER_MODE:-1}
     volumes:
       - sites-data:/home/frappe/frappe-bench/sites
       - locale-data:/home/frappe/frappe-bench/assets/locale
@@ -96,7 +104,8 @@ services:
         bench set-config -g redis_queue redis://redis-queue:6379;
         bench set-config -g redis_socketio redis://redis-queue:6379;
         bench set-config -gp socketio_port 9000;
-        bench set-config -g developer_mode 1;
+        bench set-config -gp developer_mode "$${DEVELOPER_MODE:-1}";
+        echo "developer_mode = $${DEVELOPER_MODE:-1}";
         if [ ! -d /home/frappe/frappe-bench/sites/localhost ]; then
           echo "Initializing site localhost..."
           bench new-site localhost \

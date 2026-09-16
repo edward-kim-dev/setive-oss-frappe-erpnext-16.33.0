@@ -6,9 +6,9 @@ status: draft
 applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-15
-verified_by: 포크·앱 코드 전수 실사 + 제도/상용API 웹 조사 9갈래 + 아키텍트·세무실무 2관점 심사 (2026-09-14)
-related: [KB-KOR-006, KB-KOR-007, KB-OPS-002, ONT-ENT-002, KB-KOR-002, KB-KOR-003, KB-KOR-004]
+verified_on: 2026-09-16
+verified_by: 포크·앱 코드 전수 실사 + 제도/상용API 웹 조사 9갈래 + 아키텍트·세무실무 2관점 심사 (2026-09-14) + M2 구현 후 마일스톤 상태·필드 수 재실측 (2026-09-16, §4)
+related: [KB-KOR-006, KB-KOR-007, KB-KOR-008, KB-OPS-002, KB-OPS-003, ONT-ENT-002, KB-KOR-002, KB-KOR-003, KB-KOR-004]
 ---
 
 # KB-KOR-005: 한국 현지화 로드맵 — 다음 구현 꼭지 선정 근거
@@ -91,15 +91,26 @@ related: [KB-KOR-006, KB-KOR-007, KB-OPS-002, ONT-ENT-002, KB-KOR-002, KB-KOR-00
 
 ## 4. 1차 — 세무 마스터 계층 (합의 구간)
 
-| # | 산출물 | 규모 |
-|---|---|---|
-| M1 | `korea/common/identifiers.py` — 사업자(10)·법인(13) 등록번호 체크섬. **frappe 비의존 순수 모듈** + `scripts/identifiers/selftest.py` | 1~2일 |
-| M2 | Company 8 · Customer/Supplier 11 신원 필드 + **"발급 불가 거래처" Query Report** | 3~5일 |
-| M3 | 테넌트 설정·자격증명 계층 → [KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) | 2~3일 |
-| M4 | 국세청 사업자등록 상태조회 연동 (무료 공공 API) | 3~4일 |
-| M5 | 전표 세무 분류 축 (증빙유형 × 과세유형 × 불공제 버킷) | 5~8일 |
-| M6 | 한국 Address Template · fixture 확장 · 문서화 | 3~4일 |
-| 병렬 | 팝빌 샌드박스 스파이크 → [KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md) §7 | 2~4일 |
+| # | 산출물 | 규모 | 상태 (2026-09-16) |
+|---|---|---|---|
+| M1 | `korea/common/identifiers.py` — 사업자(10)·법인(13) 등록번호 체크섬. **frappe 비의존 순수 모듈** + `scripts/identifiers/selftest.py` | 1~2일 | **미착수 — M2 의 체크섬이 여기에 막혀 있다** |
+| M2 | Company 11 · Customer/Supplier 12 신원 필드 + **"발급 불가 거래처" 리포트** | 3~5일 | **코드 완료 · 런타임 미검증** → [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §7.4·§7.5 |
+| M3 | 테넌트 설정·자격증명 계층 → [KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) | 2~3일 | 설계 정정 완료(§13), 구현 미착수 |
+| M4 | 국세청 사업자등록 상태조회 연동 (무료 공공 API) | 3~4일 | **스키마만 준비** — `Korea Party Tax Status` DocType 신설, 조회 연동 미착수 |
+| M5 | 전표 세무 분류 축 (증빙유형 × 과세유형 × 불공제 버킷) | 5~8일 | 미착수 |
+| M6 | 한국 Address Template · fixture 확장 · 문서화 | 3~4일 | fixture 확장분만 완료(신원 거래처·리포트 적중 검증) |
+| 병렬 | 팝빌 샌드박스 스파이크 → [KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md) §10.1 | 2~4일 | **사업자등록에 막힘** (§6-6) |
+| 계약 | 전자세금계산서 어댑터 계약 1벌 고정 → [KB-KOR-008](./KB-KOR-008_etax_vendor_adapter_contract.md) | — | **완료 (2026-09-16)**. 실행계획 KB-KOR-009 · 전환 런북 KB-OPS-004 는 번호만 예약 |
+
+> ⚠ **"런타임 미검증" 의 뜻**: 2026-09-16 기준 개발 스택에 컨테이너가 하나도 없고(`docker compose ps` → 0행),
+> §6-1 의 `bench migrate` 미실행도 해소되지 않았다. M2 코드는 작성·정적 검산됐으나 **사이트에서 한 번도 돌지 않았다.**
+> 실행 가능한 검증 명령은 [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §9.3 에 있다.
+
+> **필드 수 정정**: 초판은 "Company 8 · Customer/Supplier 11" 이었다. 실제 구현은 **Company 11 · Customer/Supplier 각 12**,
+> 신규 합계 **35**(기존 9 포함 44)다. 차이의 원인은 셋이다 — ① 초판 견적이 Company 의 레이아웃 필드(Column Break·섹션 닫기)를 세지 않았다
+> ② 팝빌 `joinMember` 의 `ContactName` 이 Company 코어에 없어 `setive_etax_contact_name` 이 추가됐다
+> ③ 거래처의 세금계산서 수신 이메일은 코어 `email_id` 가 대표 연락처 파생 Read Only 라 지정할 수 없어
+> `setive_etax_email` 이 추가됐다. 산술 근거는 [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §7.4.
 
 ### 4.1 M1 을 frappe 비의존으로 떼는 이유
 

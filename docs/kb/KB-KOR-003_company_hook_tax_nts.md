@@ -1,14 +1,14 @@
 ---
 id: KB-KOR-003
-title: Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정
+title: Company 훅과 한국 세무 신원 필드 — 기본계정·창고·부가세 템플릿·국세청 표준코드·거래처 신원
 domain: 한국화
 status: active
 applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-16
-verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12)
-related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001]
+verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12) + 신원 필드는 코어 JSON 실측(company/customer/supplier field_order)·Custom Field 정의 정적 검산만 수행, 런타임 미검증(2026-09-16, §9.3)
+related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001, KB-KOR-008, KB-KOR-005, ONT-ENT-002]
 ---
 
 # KB-KOR-003: Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정
@@ -215,7 +215,9 @@ Company Custom Field `setive_industry_profile`(Select `manufacturing` 기본 / `
 
 ## 7. 국세청 표준코드 (`nts_codes.py`)
 
-### 7.1 Custom Field 9개
+### 7.1 Custom Field 9개 (국세청 표준코드·업종)
+
+> 이 절의 9개는 **`nts_codes.py` 가 소유한 것**이다. 2026-09-16 에 신원 필드 35개가 `party_identity.py` 로 추가되어 **앱 전체 Custom Field 는 44개**다 — §7.4 참조. `fieldname like 'setive\_nts\_%'` 는 그대로 8 이다.
 
 `ensure_custom_fields()` 가 `create_custom_fields(..., update=True)` 로 멱등 생성한다. `after_install` / `after_migrate` 에서 실행되므로 `bench migrate` 마다 보장된다. 실측: 3회 실행 후 8개 필드의 `modified` 불변(2026-09-06). 2026-09-08 에 Company `setive_industry_profile` 이 추가돼 9개다 — 국세청 코드와 무관한 필드지만 Company Custom Field 는 이 한 곳에서 관리한다.
 
@@ -264,6 +266,149 @@ Company Custom Field `setive_industry_profile`(Select `manufacturing` 기본 / `
 ### 7.3 `report_unmapped(company)` (whitelisted)
 
 `System Manager` 또는 `Accounts Manager` 전용 읽기 점검. 코드·역할이 전부 빈 원장 목록(`unmapped`), `ledger_count`, 회사 표식과 현재 매핑표의 `stale` 여부를 돌려준다. `stale=True` 면 운영자가 `apply(company, force=True)` 를 판단한다.
+
+### 7.4 한국 세무 신원 Custom Field 35개 (`party_identity.py`)
+
+전자세금계산서가 요구하는 신원 기재사항은 ERPNext 코어에 **하나도 없다**. 실측: `company.json` 에 `ceo`·`biz_type`·`biz_class` 부재, `customer.json`·`supplier.json` 도 `tax_id` 뿐(`grep -cE '"ceo"|"biz_type"|"biz_class"' … ` → 세 파일 전부 0). 소급 수집 비용이 기하급수라 거래처가 쌓이기 전에 심는다.
+
+> ⚠ **법적 근거를 정확히 쓴다.** 부가가치세법 제32조① 은 공급받는자 측에 **등록번호만**
+> 필요적 기재사항으로 요구하고, 상호·대표자성명·업태·종목은 **임의적** 기재사항이다(시행령 제67조②).
+> 전자세금계산서 XML 이 이 중 상호·대표자성명을 `1..1` 로 요구하는 것은 **별개 층위**다
+> ([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §2.5).
+> 이 구분을 명시하지 않으면 **"대표자명 결측 = 매입세액 불공제"** 라는 잘못된 검증이 코드에 박힌다.
+> 아래 필드와 §7.5 리포트는 결측을 **발급 가능 여부**로만 판정하고 공제 여부는 판정하지 않는다.
+
+필드 집합은 세 출처의 **합집합**이다 — 팝빌 `joinMember` 필수 11 · 볼타 발급자 등록 3 · 전자세금계산서 XML 필수기재([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §2.5). **코어에 이미 있는 것은 신설하지 않는다**: 사업자등록번호 → `tax_id`, 상호 → `company_name`/`customer_name`/`supplier_name`, Company 담당자 이메일·전화 → 코어 `email`·`phone_no`.
+
+| fieldname | 타입 | Company | Customer | Supplier | 비고 |
+|---|---|:-:|:-:|:-:|---|
+| `setive_kr_tax_section` | Section Break | ✅ | ✅ | ✅ | 「한국 세무 신원」 |
+| `setive_ceo_name` | Data(100) | ✅ | ✅ | ✅ | 대표자성명. 팝빌 `CEOName` · 볼타 `representativeName` |
+| `setive_biz_type` | Data(100) | ✅ | ✅ | ✅ | 업태. 팝빌 `BizType` |
+| `setive_biz_class` | Data(100) | ✅ | ✅ | ✅ | 종목. 팝빌 `BizClass` |
+| `setive_biz_open_date` | Date | ✅ | ✅ | ✅ | 개업일자. 국세청 진위확인의 `start_dt` |
+| `setive_kr_tax_column_break` | Column Break | ✅ | ✅ | ✅ | |
+| `setive_corp_reg_no` | Data | ✅ | ✅ | ✅ | 법인등록번호 13자리 |
+| `setive_branch_code` | Data | ✅ | ✅ | ✅ | 종사업장번호 4자리 |
+| `setive_tax_payer_type` | Select | ✅ | ✅ | ✅ | 과세유형. **신고값**이며 관측값은 로그로 간다 |
+| `setive_etax_contact_name` | Data(100) | ✅ | | | 팝빌 `ContactName`. 코어에 없다 |
+| `setive_etax_email` | Data/Email | | ✅ | ✅ | 세금계산서 수신처. 코어 `email_id` 는 대표 연락처 파생 Read Only 라 지정 불가 |
+| `setive_tax_status` | Data (read_only) | | ✅ | ✅ | 관측 상태의 **파생 표시**. 권위 아님 |
+| `setive_tax_status_checked_on` | Datetime (read_only) | | ✅ | ✅ | 조회 시각. 이 값 없이는 상태가 의미 없다 |
+| `setive_kr_tax_section_end` | Section Break | ✅ | | | 섹션 닫기 — 아래 참조 |
+| **소계** | | **11** | **12** | **12** | **신규 35** |
+
+> Company 에만 섹션 닫기 필드가 있다. `company.json` field_order 는 `date_of_establishment`(11) 뒤에
+> `parent_company`(12) · `reporting_currency`(13) 가 오므로, 닫지 않으면 이 둘이 「한국 세무 신원」
+> 섹션 안으로 끌려 들어간다. Customer/Supplier 는 섹션이 Tax 탭 **마지막**이고 바로 뒤가
+> `settings_tab`(Tab Break)이라 자동으로 닫힌다. (italy 도 Company 섹션을 닫지 않지만 선례가 곧 정상은 아니다.)
+
+**산술 — Custom Field 레코드는 (dt, fieldname) 쌍이다.** 같은 `fieldname` 이 3개 DocType 에 있으면 레코드는 **3개**다. 레코드 이름이 `{dt}-{fieldname}` 임은 코어가 전제한다 — [`erpnext/patches/v16_0/rename_italy_customer_name_fields.py`](../../erpnext/patches/v16_0/rename_italy_customer_name_fields.py):17·40 이 `f"Customer-{fieldname}"` 과 `"Company-fiscal_regime"` 를 따로 지목한다. 같은 이름 `fiscal_code` 가 Company·Customer·Supplier 3곳에 각각 만들어지는 것도 코어 선례다([`erpnext/regional/italy/setup.py`](../../erpnext/regional/italy/setup.py):120·207·448).
+
+```
+기존 9 (§7.1: Account 7 + Company 2) + 신규 35 (11 + 12 + 12) = 44
+DocType 별 최종 — Account 7 · Company 13 · Customer 12 · Supplier 12
+```
+
+기대값은 코드에서 유도한다 — `party_identity.app_field_counts()` 가 `nts_codes` 와 `party_identity`
+두 소유자를 합산해 `{DocType: n, "_total": n}` 을 돌려주고, fixture 가 그 값으로 DB 를 대조한다.
+**손으로 센 숫자를 기대값으로 쓰지 않는다** — (f)가 경고하는 "기대값이 틀리면 검증이 성공으로
+잘못 통과한다"가 바로 여기서 일어난다. 별도로 전역 카운트 44 를 고정 기준선으로 함께 단언해
+정의와 DB 가 **같이** 틀리는 경우도 잡는다.
+
+`insert_after` 앵커는 DocType 마다 다르며 실측값이다. Customer 와 Supplier 가 다른 것은 오타가 아니라 **코어가 두 DocType 에서 `tax_withholding_group`/`category` 순서를 반대로 두었기** 때문이다.
+
+| DocType | 앵커 | 근거 |
+|---|---|---|
+| Company | `date_of_establishment` | `field_order` idx 11. italy 가 `sb_e_invoicing` 을 거는 자리와 같다 |
+| Customer | `tax_withholding_category` | idx 53. Tax 탭의 **마지막** 필드 |
+| Supplier | `tax_withholding_group` | idx 42. Tax 탭의 **마지막** 필드 |
+
+설계 규칙:
+
+- **`reqd` 를 절대 걸지 않는다.** §7.1 의 근거(`chart_of_accounts` 의 `ignore_mandatory`)는 Account 전용이라 여기 적용되지 않고, **더 나쁜 근거가 따로 있다** — [`erpnext/selling/doctype/quotation/quotation.py`](../../erpnext/selling/doctype/quotation/quotation.py):611-642 의 `create_customer_from_lead` 가 `frappe.MandatoryError` 를 잡아 `frappe.throw("Mandatory Missing")` 으로 바꾼다. Lead 에는 `setive_*` 가 없으므로 reqd 필드 하나가 **견적 → 수주/송장 전환 전체를 100% 막는다.**
+- **`default` 를 걸지 않는다.** 특히 `setive_tax_payer_type` 은 선행 빈 옵션(`"\n일반과세자\n…"`)을 둔다. 없으면 DB 는 `""` 인데 폼은 첫 옵션을 보여주고, 사용자가 **아무 필드나** 고쳐 저장하는 순간 과세유형이 조용히 확정된다. 과세유형은 발행 판정에 직결되므로 조용한 확정이 곧 오발행이다.
+- **주소 필드를 만들지 않는다.** ERPNext 는 주소를 `Address` DocType 으로 모델링하고 `customer_primary_address`/`supplier_primary_address` Link 가 있다. 팝빌 `Addr`(300자)는 발행·등록 시점에 그 Address 를 평탄화해 만든다. 필드로 복제하면 두 번째 진실이 생긴다.
+- **`read_only` 는 서버에서 강제되지 않는다.** `setive_tax_status` 2필드는 캐시이고 권위는 `Korea Party Tax Status` 로그의 최신 행이다. 읽기는 `party_identity.tax_status()` 하나로 통일하고, 쓸 때는 반드시 `frappe.db.set_value(..., update_modified=False)` — 기본값 `True` 면 `modified` 가 올라가 폼을 열어 둔 사용자의 다음 저장이 `TimestampMismatchError` 로 죽는다.
+
+#### 검증 정책 — `warn` 기본, 거처는 `site_config`
+
+```bash
+bench --site $SITE set-config setive_brn_validation_policy block   # 기본은 warn
+```
+
+- 국세청 상태조회 결과로 저장을 **hard block 하지 않는다.** 신규 개업자는 국세청 반영에 1~2일 걸려 정상 거래처 등록을 막는 오탐이 난다([KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4.2).
+- **`tax_id` 는 어떤 판정으로도 막지 않는다.** 코어의 국가중립 필드이며 description 이 "e.g. PAN, VAT, GST" 다([`erpnext/buying/doctype/supplier/supplier.json`](../../erpnext/buying/doctype/supplier/supplier.json):130). 자릿수가 다르면 해외 식별자로 보고 판정 자체를 하지 않고, **자릿수가 같아도 막지 않는다** — 폴란드 NIP · 터키 vergi kimlik no · 러시아 법인 INN 이 전부 숫자 10자리라 길이만 보고 한국 체크섬을 태우면 거의 전부 실패한다. 막는 순간 수출·해외매입 테넌트가 거래처를 하나도 저장하지 못한다. 체크섬 불일치는 **경고로만** 알리고 §7.5 리포트가 목록으로 낸다.
+- `block` 이 실제로 막는 것은 **우리가 만든 한국 전용 필드의 오류뿐**이다 — `setive_corp_reg_no`(형식·체크섬), `setive_branch_code`(형식). 이 둘은 해외 식별자가 들어올 자리가 아니라 모호함이 없다. 필드별 정책은 `party_identity.BLOCKING_VERDICTS_BY_FIELD` 에 있다.
+- 차단 예외는 전용 타입 `party_identity.BrnValidationError` 다. `frappe.ValidationError` 를 그대로 쓰면 하위 30여 종(`MandatoryError`·`LinkValidationError`·TDR 실행 중 차단 …)이 전부 같은 것으로 잡혀 **정책이 망가져 있어도 검증이 통과한다.**
+- Single DocType 이 아니라 `site_config` 인 이유: 거래처는 Company 에 속하지 않으므로(Customer/Supplier 에 `company` 필드가 없다) 회사별 정책은 적용 대상이 없고, Single 로 두면 그 DocType 이 DB 에 없는 동안 `get_single` 이 `DoesNotExistError` 를 내는데 그게 `validate` 훅 안이면 **사이트의 모든 거래처 저장이 죽는다.** KB-KOR-009 에서 `Korea Integration Settings` 가 실재하면 정책을 옮기고 `site_config` 는 상한으로 남긴다([KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) §5.1 과 같은 fail-safe).
+
+#### 체크섬은 이 모듈이 하지 않는다 — M1 선행
+
+체크섬 검증은 `korea/common/identifiers.py` 소관이며 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M1 산출물**이다(frappe 비의존 순수 모듈 + `scripts/identifiers/selftest.py`). 2026-09-16 기준 **미착수**다(`grep -rniE 'checksum|사업자등록|luhn' --include='*.py'` → 앱·포크 전부 0건).
+
+`party_identity` 는 seam 만 갖는다. **조용히 넘기지 않는다** — 엔진이 없으면 판정이 `미검증(unverified)` 이 되고 리포트가 **행마다** 그렇게 표시한다. 체크섬이 안 돌았는데 "이상 없음"을 보고하는 것은 [`CLAUDE.md`](../../CLAUDE.md) 가 `erpnext/regional/korea/` 금지의 근거로 지목한 바로 그 무증상 실패다.
+
+seam 은 `try/except` 가 아니라 `importlib.util.find_spec` 을 쓴다. 이유 둘: ① `from pkg import missing` 는 `ModuleNotFoundError` 가 아니라 **`ImportError`** 를 내고 `exc.name` 이 부모 패키지로 잡혀 이름 기반 가드가 안 먹는다. ② 모듈이 존재하는데 내부 오타·순환참조로 ImportError 가 나도 똑같이 잡혀 **체크섬이 조용히 꺼진 채 배포된다.**
+
+M1 이 제공해야 하는 API:
+
+```python
+def validate_brn(digits: str) -> bool     # 사업자등록번호 10자리
+def validate_crn(digits: str) -> bool     # 법인등록번호 13자리
+def normalize_brn(value) -> str | None    # party_identity 의 임시 구현을 대체한다
+def normalize_crn(value) -> str | None
+```
+
+#### 주민등록번호를 1차에 만들지 않는다 — 사람 승인 대상
+
+**전제**: "개인(비사업자) 공급받는자 대상 발급을 1차 범위에서 제외한다." **이 전제 자체가 사람 승인 사항이며 에이전트가 판정하지 않는다.**
+
+전제가 유지될 때의 영향:
+
+| 잃는 것 | 근거 |
+|---|---|
+| `BusinessType.Code` **02 발급 불가** | 코드 02 는 ID 칸에 RRN 13자리를 실제로 요구한다([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md):81·132-142) |
+| 매출처별 세금계산서합계표의 **주민등록번호 발급분 행 집계 불가** | 합계표는 사업자등록번호 발급분과 주민등록번호 발급분을 **별도 행**으로 집계한다(:81) |
+| B2C 매출 테넌트는 1차에서 발급 기능을 쓸 수 없다 | 〃 |
+
+나중에 넣을 때 필요한 것 — **필드 신설과 같은 시점에** 갖춰야 한다. 나중에 얹을 수 없다.
+
+- 암호화 저장 · 접근통제(permlevel) · **파기 정책** · 개인정보 처리방침 고지
+- 검증은 **경고만** 가능하다 — 2020-10 이후 발급분은 뒤 7자리 중 성별 1자리를 제외한 6자리가 임의번호로 바뀌어 **종전 체크섬이 성립하지 않는다**(:77). 규칙을 무조건으로 기술하면 구현이 hard block 을 만든다.
+
+### 7.5 「발급 불가 거래처」 리포트
+
+`Korea Etax Ineligible Parties` — 세금계산서 XML 이 요구하는 상호·대표자성명·업태·종목이 결측인 거래처와 사업자등록번호 오류를 목록으로 낸다. 폴더는 `setive_erpnext_kr/setive_erpnext_kr/report/korea_etax_ineligible_parties/`, 파일 4개(`__init__.py`·`.json`·`.py`·`.js`)이며 `.json` 의 키 집합·`is_standard`·`roles`(`Accounts User`·`Accounts Manager`·`Auditor`)는 기존 3종과 동일하다.
+
+**리포트가 내부 함수보다 중요한 이유** — `validate` 훅은 무결성 보장 수단이 못 된다. `flags.ignore_validate=True` 로 저장하는 코어 경로가 실재하고([`erpnext/buying/doctype/request_for_quotation/request_for_quotation.py`](../../erpnext/buying/doctype/request_for_quotation/request_for_quotation.py):279-283), Data Import·REST·스케줄러 경로에서는 `msgprint` 를 아무도 보지 않는다. **실무자가 직접 보고 채우는 화면이 유일한 안전망이다.**
+
+| 필터 | 타입 | 기본 | 비고 |
+|---|---|---|---|
+| `company` | Link(Company) | 사용자 기본 회사 | **reqd 아님** — 아래 참조 |
+| `party_type` | Select | 둘 다 | 둘 다 / 고객 / 공급업체 |
+| `missing_field` | Select | 전체 | 전체 / 상호 / 대표자성명 / 업태 / 종목 / **사업자등록번호 결측** / **사업자등록번호 체크섬 오류** — 결측과 체크섬을 한 값으로 합치면 구분 요구가 필터에서 무너진다 |
+| `only_active` | Check | 1 | 끄면 비활성 포함. "끈 상태"와 "미지정"이 같은 뜻이라 뒤집지 않았다 |
+
+> ⚠ **거래처는 회사에 귀속되지 않는다.** Customer/Supplier 에 `company` 필드가 없다(실측: 두 JSON 전수. `represents_company` 는 "이 거래처가 대표하는 회사"로 뜻이 다르다). 회사를 지정하면 **그 회사의 `Party Account` 설정이 있거나 전표에 등장한** 거래처로만 좁히므로 **거래 이력이 없는 신규 거래처가 빠진다.** 발급 전에 마스터 결함을 잡는 것이 목적이므로 빠짐없이 보려면 회사를 비운다. 이 사실을 리포트 머리말로 화면에 고지한다.
+
+**`report_type` 은 `Script Report` 다.** 진성 Query Report(정적 SQL 1개)로도 만들 수는 있으나 셋을 포기해야 한다.
+
+1. **체크섬 규칙이 SQL 로 복제된다.** [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 M1 이 체크섬을 frappe 비의존 순수 모듈 **1곳**에 두기로 이미 결정했는데, SQL 사본은 `scripts/identifiers/selftest.py` 가 검산하지 못한다. 단일 권위가 깨진다.
+2. **머리말(`message`)을 낼 수 없다.** `execute_query_report` 는 `[columns, result]` 2개 고정 반환이라 회사 필터의 의미나 체크섬 엔진 부재를 고지할 자리가 없다.
+3. **15초 초과 시 Prepared Report 자동 승격이 없다**(Script Report 전용).
+
+두 타입 모두 Desk 의 같은 `/app/query-report/<name>` 화면에서 렌더되므로 실무자가 보는 화면은 동일하다 — 이건 선택 근거가 아니라 확인 사항이다. 근거: [`erpnext/change_log/v15/v15_64_0.md`](../../erpnext/change_log/v15/v15_64_0.md):7 이 Script Report 인 `Calculated Discount Mismatch` 를 그 라우트로 링크한다.
+
+권한은 두 층으로 건다.
+- **역할**: `ref_doctype` 이 `Customer` 하나뿐이므로 `execute()` 첫머리에서 `frappe.only_for(...)` 와 대상 DocType 별 `frappe.has_permission` 을 직접 확인한다. 같은 관례가 `nts_codes.report_unmapped` 에 이미 있다(§7.3).
+- **User Permission**: 거래처 조회를 `frappe.get_all` 이 아니라 **`frappe.get_list`** 로 한다. `get_all` 은 `ignore_permissions=True` 를 강제하고, 이 리포트의 거래처 컬럼이 `Dynamic Link` 라 frappe 의 사후 방어(`get_filtered_data` → `get_linked_doctypes`)도 못 막는다 — 그 함수는 `fieldtype == "Link"` 만 수집한다. `get_all` 을 쓰면 **담당 거래처가 제한된 사용자가 전 거래처의 상호·사업자등록번호를 본다.**
+
+사업자 상태 컬럼은 캐시 필드가 아니라 **로그에서 읽는다.** `party_identity.tax_status_bulk()` 가 `Korea Party Tax Status` 최신 행을 1회 조회로 가져온다. 캐시(`setive_tax_status`)를 직접 SELECT 하면 `stale_days` 규칙이 우회되어 **오래된 관측이 현재 상태처럼 표시된다.** 폐업일(`end_dt`)도 함께 컬럼으로 낸다 — 폐업자 수취분도 폐업일 **이전** 공급분은 정상 공제되므로 현재 상태만 보는 판정은 틀린다.
+
+이 리포트만 `disable_prepared_report_automation` 을 **0** 으로 둔다(기존 3종은 1). 거래처 전건 + `GL Entry` DISTINCT 를 훑어 앱에서 유일하게 15초를 넘길 수 있고, 위 선택 근거 3번이 그 자동 승격을 이점으로 들었기 때문이다. 끄면 근거와 설정이 반대가 된다.
+
+등재는 `install_reports()` 가 처리한다. 단 `REPORT_FORMS` 는 **이름 → 서식** 의미 사전이라 서식 없는 리포트를 넣으면 오염되므로, 등재 목록을 `INSTALLABLE_REPORTS` 로 분리했다.
 
 ## 8. 기존 사이트 백필 절차
 
@@ -396,6 +541,85 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 | 9 | 정리 | 회사 스코프 잔여 0, 전역 Company/GL/Fiscal Year/Item/Customer/Supplier 0, 시리즈 카운터 삭제. 남긴 것: Tax Category 2(전역), Custom Field 8(앱 자산) |
 | 10 | 재기동 후 `/login` · `/api/method/ping` | 200 |
 
+### 9.3 신원 필드·리포트 검증 (2026-09-16 추가)
+
+> ⚠ **아래는 아직 실행되지 않았다.** 2026-09-16 기준 개발 스택에 컨테이너가 하나도 없고
+> (`docker compose -f $COMPOSE ps` → 0행), 사이트 DB 스키마의 17-dev 잔류(§10-1)도 미해소다.
+> 명령은 재현 가능하게 적어 두되 **"검증 통과"로 보고하지 않는다.**
+
+```bash
+COMPOSE=docker/development/docker-compose.yml
+SITE=localhost
+EXEC="docker compose -f $COMPOSE exec -T backend"
+PY=/home/frappe/frappe-bench/env/bin/python
+
+# 0. 선행 — 스택 기동 + 스키마 정합. 사람 승인 사항이다(§10-1)
+make up-dev
+$EXEC bench --site $SITE migrate
+
+# 1. Custom Field 개수. LIKE 의 `_` 는 단일문자 와일드카드이므로 반드시 이스케이프한다.
+#    setive_nts_% 만 세면 신원 필드를 전혀 못 센다 — M2 이후에도 8 로 고정이다.
+$EXEC bench --site $SITE execute frappe.client.get_count \
+  --kwargs "{'doctype':'Custom Field','filters':{'fieldname':['like','setive\\_nts\\_%']}}"   # → 8
+$EXEC bench --site $SITE execute frappe.client.get_count \
+  --kwargs "{'doctype':'Custom Field','filters':{'fieldname':['like','setive\\_%']}}"         # → 44
+
+# 2. DocType 별 분해 — 이게 진짜 검산이다 (레코드는 (dt, fieldname) 쌍이다)
+#    기대: Account 7 · Company 13 · Customer 12 · Supplier 12
+for DT in Account Company Customer Supplier; do
+  $EXEC bench --site $SITE execute frappe.client.get_count \
+    --kwargs "{'doctype':'Custom Field','filters':{'dt':'$DT','fieldname':['like','setive\\_%']}}"
+done
+
+# 3. 같은 fieldname 이 3 레코드인지 — §7.4 산술의 직접 확인. 기대 3
+$EXEC bench --site $SITE execute frappe.client.get_list \
+  --kwargs "{'doctype':'Custom Field','filters':{'fieldname':'setive_ceo_name'},'fields':['name','dt'],'limit_page_length':0}"
+# → Company-setive_ceo_name · Customer-setive_ceo_name · Supplier-setive_ceo_name
+
+# 4. DocType 등재 — Korea Party Tax Status 테이블이 실재하는가
+$EXEC bench --site $SITE execute frappe.db.table_exists --kwargs "{'doctype':'Korea Party Tax Status'}"   # → True
+
+# 5. 리포트 등재
+$EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_report.install_reports
+# → {'NTS Standard Balance Sheet': True, ..., 'Korea Etax Ineligible Parties': True}
+#    ⚠ .json 을 고쳤는데 `modified` 를 올리지 않으면 import_file_by_path 가 조용히 스킵한다.
+#      반영 여부는 아래로 확인한다.
+$EXEC bench --site $SITE execute frappe.client.get_value \
+  --kwargs "{'doctype':'Report','filters':{'name':'Korea Etax Ineligible Parties'},'fieldname':['modified','report_type','module']}"
+
+# 6. 체크섬 엔진 유무 — M1 착수 전에는 False 가 정답이다
+$EXEC $PY -c "from setive_erpnext_kr.korea.common import party_identity as p; print(p.checksum_engine_available())"
+
+# 7. 정규화 — 하이픈 입력이 숫자만 남는가 (컨테이너·bench 없이도 확인 가능한 순수 함수)
+$EXEC $PY -c "from setive_erpnext_kr.korea.common import party_identity as p; \
+print(p.normalize_brn('124-81-00998'), p.normalize_crn('110111-1234569'), p.normalize_brn('GB123456789'))"
+# → 1248100998 1101111234569 GB123456789   (마지막은 해외 식별자라 원본 보존)
+
+# 8. 검증 정책 — block 으로 바꾸면 형식 오류가 거부되는가
+$EXEC bench --site $SITE set-config setive_brn_validation_policy block
+# ⚠ site_config 반영은 워커 프로세스당 최대 60초 지연된다
+$EXEC bench --site $SITE set-config setive_brn_validation_policy warn
+
+# 9. fixture — 신원 거래처 생성 · 개수 · 정규화 · block 정책 · 리포트 적중까지 한 번에
+docker compose -f $COMPOSE cp ../setive_erpnext_kr/scripts/nts/fixture_company.py backend:/tmp/fixture_company.py
+for KEY in mfg trd; do
+  docker compose -f $COMPOSE exec -T -w /home/frappe/frappe-bench/sites backend \
+    $PY /tmp/fixture_company.py $SITE setup $KEY
+done
+# setup 안에서 assert_custom_field_counts · assert_normalized · assert_block_policy ·
+# assert_report 가 차례로 돈다. 실패하면 AssertionError 로 멈춘다.
+
+# 10. 정리 — 잔여 0 이어야 한다
+for KEY in mfg trd; do
+  docker compose -f $COMPOSE exec -T -w /home/frappe/frappe-bench/sites backend \
+    $PY /tmp/fixture_company.py $SITE teardown $KEY
+done
+# → "Company exists: False | residue rows: 0"
+
+# 11. 리포트를 Desk 에서 직접 — 실무자가 보는 화면
+#    /app/query-report/Korea%20Etax%20Ineligible%20Parties
+```
+
 ## 10. 알려진 한계·후속 과제
 
 1. ~~**환경 불일치 — 포크와 이미지 frappe 버전.**~~ **해소됨 (2026-09-06 리베이스).** 포크를 `develop`(17.0.0-dev) 에서 태그 `v16.33.0` 위로 리베이스해 `Meta.get_translated_label` 호출이 0건이 됐다. 재실측: `erpnext 16.33.0 / frappe 16.31.0`, `hasattr(Meta,'get_translated_label')` → `False`, 구 크래시 지점 `buying_controller.validate_from_warehouse` 직접 호출 시 `AttributeError` 가 아니라 정상 `ValidationError`. E2E 의 shim 은 더 이상 필요 없다. 사고 경위·재발 방지는 [KB-OPS-001 §1.7](./KB-OPS-001_tenant_provisioning_deployment.md) 로 옮겼다.
@@ -434,6 +658,11 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 ---
 
 ## 12. 이전 서술 정정
+
+### 2026-09-16 (2) — 신원 필드 추가에 따른 정정
+
+- **"Company Custom Field 는 이 한 곳에서 관리한다" 는 더 이상 사실이 아닙니다.** §7.1 과 [`korea/common/nts_codes.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/nts_codes.py):129 주석이 그렇게 적었는데, 2026-09-16 에 신원 필드가 `party_identity.py` 로 들어오면서 **Company Custom Field 의 소유자가 둘**이 됐습니다(회계·업종 → `nts_codes`, 세무 신원 → `party_identity`). 그대로 두면 다음 사람이 `nts_codes.get_custom_fields()` 만 보고 "Company 필드는 2개"라고 판단합니다. 소스 주석을 고쳤고 `install.py` 의 `_ensure_custom_fields` 가 **둘 다** 부릅니다 — 한쪽만 부르면 무증상으로 필드가 빠집니다.
+- **"Custom Field 9개" 는 이제 앱 전체 총계가 아닙니다.** 9 는 `nts_codes` 소유분(Account 7 + Company 2)이고 전체는 **44**(§7.4)입니다. §8 백필 절차의 점검 명령이 `fieldname like 'setive\_nts\_%'` 로 **8** 을 기대하는 것은 그대로 맞지만, 그 명령만으로는 신원 필드를 **전혀 세지 못합니다** — M2 이후에도 8 로 고정입니다. §9.3 에 DocType 별 분해 명령을 추가했습니다.
 
 ### 2026-09-16
 

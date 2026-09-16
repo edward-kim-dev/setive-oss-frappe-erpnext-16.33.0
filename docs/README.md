@@ -27,7 +27,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-LOC-003](./kb/KB-LOC-003_fork_local_translation.md) | 번역 문자열 추가 규약 — 앱 ko.po 에 쓰고 포크 main.pot 만 갱신 (msgctxt) | 한글화 |
 | [KB-KOR-001](./kb/KB-KOR-001_ksic_wizard_industry.md) | 셋업 위저드 업종 분류를 KSIC 대분류로 교체 | 한국화 |
 | [KB-KOR-002](./kb/KB-KOR-002_korean_chart_of_accounts.md) | 한국 표준 계정과목표 (일반기업회계기준) 와 국세청 표준재무제표 코드 매핑 | 한국화 |
-| [KB-KOR-003](./kb/KB-KOR-003_company_hook_tax_nts.md) | Company 훅 — 기본계정·창고·부가세 템플릿·국세청 표준코드 자동 설정 | 한국화 |
+| [KB-KOR-003](./kb/KB-KOR-003_company_hook_tax_nts.md) | Company 훅과 한국 세무 신원 필드 — 기본계정·창고·부가세 템플릿·국세청 표준코드·거래처 신원 | 한국화 |
 | [KB-OPS-001](./kb/KB-OPS-001_tenant_provisioning_deployment.md) | 테넌트 프로비저닝·배포 파이프라인 (SETIVE Backend 참조) | 운영·배포 |
 | [KB-KOR-004](./kb/KB-KOR-004_nts_financial_statements.md) | 국세청 표준재무제표 리포트 (표준재무상태표·표준손익계산서·제조원가명세서) | 한국화 |
 | [KB-KOR-005](./kb/KB-KOR-005_localization_roadmap.md) | 한국 현지화 로드맵 — 다음 구현 꼭지 선정 근거와 3단계 계획 | 한국화 |
@@ -35,6 +35,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-OPS-002](./kb/KB-OPS-002_tenant_integration_credentials.md) | 테넌트 연계 설정·자격증명 계층 — 무엇을 파일에 두고 무엇을 DB 에 두는가 | 운영·배포 |
 | [KB-KOR-007](./kb/KB-KOR-007_bank_reconciliation.md) | 은행 입금 대사 아키텍처 — 팝빌 계좌조회에서 오픈뱅킹으로 가는 경로 | 한국화 |
 | [KB-OPS-003](./kb/KB-OPS-003_popbill_partner_onboarding.md) | 팝빌 파트너 가입 실행 가이드 — 사업자등록 전부터 첫 실발행까지 | 운영·배포 |
+| [KB-KOR-008](./kb/KB-KOR-008_etax_vendor_adapter_contract.md) | 전자세금계산서 어댑터 계약 — 모듈 경로·DocType·포트·상태축·관리번호 단일화 | 한국화 |
 
 ### ONT — 온톨로지 입력물
 

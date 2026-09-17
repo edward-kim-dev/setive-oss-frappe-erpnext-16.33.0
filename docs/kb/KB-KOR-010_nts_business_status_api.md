@@ -8,13 +8,13 @@ applies_to:
   - data.go.kr/data/15081808
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-17
-verified_by: 사용자 제공 Swagger(infuser.odcloud.kr/api/stages/28493/api-docs) 전문 독해 + data.go.kr 데이터셋 메타·이용정책·이용약관·공공누리 원문 대조 + 기존 KB 4종 한 항씩 재검증(2026-09-17). **API 실호출 없음** — serviceKey 를 요구·추측하지 않았다
+verified_by: 사용자 제공 Swagger(infuser.odcloud.kr/api/stages/28493/api-docs) 전문 독해 + data.go.kr 데이터셋 메타·이용정책·이용약관·공공누리 원문 대조 + 기존 KB 4종 한 항씩 재검증 + **개발키로 실호출 6종 검증**(scripts/nts/probe.py, 2026-09-17). valid=01 경로는 실제 대표자성명 전송이 필요해 미실측
 related: [KB-KOR-005, KB-KOR-003, KB-KOR-008, ONT-ENT-002, KB-OPS-002]
 ---
 
 # KB-KOR-010: 국세청 사업자등록 진위확인·상태조회 API
 
-> **상태**: 스펙 확보 완료, 구현 미착수. 파서·어댑터는 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M4** 소관이다.
+> **상태**: 스펙 확보 + **실호출 검증 완료**, 파서·어댑터 구현 미착수. 파서·어댑터는 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M4** 소관이다.
 > 이 문서는 그 착수 전에 확정해야 할 사실만 담는다.
 > ⚠ **이 문서는 기존 KB 4종의 서술을 정정한다** — §8 을 먼저 읽는다.
 
@@ -43,7 +43,7 @@ POST https://api.odcloud.kr/api/nts-businessman/v1/status     상태조회
 
 **설계를 가르는 세 가지.**
 
-1. **`/validate` 가 `/status` 의 응답을 통째로 품는다.** 진위확인 1회로 진위 + 휴폐업 + 과세유형을 동시에 얻는다. 두 오퍼레이션을 별개 마일스톤으로 두면 호출이 낭비된다.
+1. **`/validate` 는 일치할 때만 `/status` 의 응답을 품는다.** 진위확인이 성공(`valid=01`)하면 진위 + 휴폐업 + 과세유형을 한 호출로 얻는다. 그러나 **불일치(`valid=02`)면 `status` 키가 아예 오지 않는다**(실측) — 그때는 상태를 따로 조회해야 한다. 즉 "한 호출로 둘 다" 는 **성공 경로에만** 성립한다.
 2. **`/status` 응답에 상호도 대표자명도 없다.** 이건 조회 API 가 아니라 **검증 API** 다. 「발급 불가 거래처」의 결측 상호·대표자명을 국세청에서 **채울 수 없다** — 사람이 채워야 한다는 [KB-KOR-003](./KB-KOR-003_company_hook_tax_nts.md) §7.5 의 전제가 그대로 유지된다.
 3. **개인정보가 응답이 아니라 요청에 있다.** `/validate` 는 대표자성명을 국세청으로 **보내는** API 다. `/status` 만 쓰면 개인정보 처리가 사실상 발생하지 않는다.
 
@@ -135,6 +135,20 @@ Swagger 원문: *"`GET` METHOD가 아닌 `POST` METHOD 로만 제공됩니다."*
 
 `/validate` 는 여기에 `valid`(`01` Valid / `02` Invalid) · `valid_msg` · `request_param`(요청 에코백) 을 더한다.
 
+**미등록 사업자번호의 실제 응답** (실측) — `tax_type` 에만 메시지가 오고 **나머지 필드는 전부 빈 문자열**이다.
+
+```json
+{ "b_no": "1234567890", "b_stt": "", "b_stt_cd": "",
+  "tax_type": "국세청에 등록되지 않은 사업자등록번호입니다.", "tax_type_cd": "",
+  "end_dt": "", "utcc_yn": "", "tax_type_change_dt": "",
+  "invoice_apply_dt": "", "rbf_tax_type": "", "rbf_tax_type_cd": "" }
+```
+
+최상위는 `{request_cnt, match_cnt, status_code, data[]}` 다. **`match_cnt` 는 요청 중 국세청에 등록된 건수**다 — 위 예시는 3건 요청에 `match_cnt: 2`.
+
+> ⚠ **미등록 판별을 문자열 매칭으로 하지 않는다.** 실물 문자열에는 Swagger description 과 달리 **마침표가 붙어 있다**(`…입니다.`). 문구가 바뀌면 조용히 깨진다.
+> 대신 **`b_stt_cd` 가 빈 문자열인가**로 판별하고, 총계는 `match_cnt < request_cnt` 로 교차 확인한다. 둘 다 구조적 신호라 문구 변경에 영향받지 않는다.
+
 > **응답에 `checked_on` 은 없다.** 관측 시각은 **우리가 붙이는 메타데이터**다([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §2.2 가 요구하는 `checked_on` 이 그것). `b_stt_dt`·`open_dt` 도 없다.
 
 ### 4.2 과세유형은 **7종**이다
@@ -155,12 +169,12 @@ Swagger 원문: *"`GET` METHOD가 아닌 `POST` METHOD 로만 제공됩니다."*
 
 **미등록·삭제된 사업자등록번호는 `b_stt_cd` 가 아니라 `tax_type` 문자열로 온다.**
 
-```
-tax_type = "국세청에 등록되지 않은 사업자등록번호입니다"   ← /status
-valid_msg = "확인할 수 없습니다"                          ← /validate (valid=02)
-```
+| | Swagger description | **실물 (실측)** |
+|---|---|---|
+| `/status` `tax_type` | `국세청에 등록되지 않은 사업자등록번호입니다` | `국세청에 등록되지 않은 사업자등록번호입니다**.**` |
+| `/validate` `valid_msg` | `확인할 수 없습니다` | `확인할 수 없습니다**.**` |
 
-> ⚠ 문자열 매칭이므로 국세청이 문구를 바꾸면 조용히 깨진다. 판별 코드에 이 사실을 주석으로 남기고, 매칭 실패 시 "미상" 으로 떨어뜨린다(정상으로 간주하지 않는다).
+> ⚠ **실물에는 마침표가 있고 Swagger 문서에는 없다.** 문서 문자열을 그대로 복사해 `==` 비교하면 **영구히 매칭 실패**한다. 애초에 문자열 매칭을 쓰지 말고 §4.1 의 구조적 신호(`b_stt_cd == ""`, `match_cnt`)를 쓴다.
 
 ### 4.3 `utcc_yn` — 폐업 판정을 뒤집는 필드
 
@@ -188,7 +202,21 @@ valid_msg = "확인할 수 없습니다"                          ← /validate 
 
 Swagger 원문: *"에러 종류에 따라 status code가 400, 411, 413, 500 으로 반환되며, 에러 발생시에도 response에 오류 메세지가 return됩니다."*
 
-> **운영 코드는 `status_code == "OK"` 를 명시적으로 검사한다.** HTTP 200 만 보고 통과시키지 않는다. 그 외 응답은 **바디 원문을 그대로 로그에 남긴다** — `api.odcloud.kr` 게이트웨이가 잘못된 키에 대해 정확히 무엇을 돌려주는지는 **미확인**이다(§9).
+**인증 실패의 실제 응답** (실측) — `status_code` 봉투가 **아니다.** 별개 형식이다.
+
+```
+HTTP 401   {"code": -4, "msg": "등록되지 않은 인증키 입니다."}
+```
+
+> ⚠ 웹에 흔한 `OpenAPI_ServiceResponse` / `cmmMsgHeader` / `SERVICE_KEY_IS_NOT_REGISTERED_ERROR` 봉투는 **`apis.data.go.kr` 계열의 포맷이고 이 호스트는 쓰지 않는다.** 그 문자열을 찾는 코드를 쓰면 인증 오류를 못 잡는다.
+
+**한도 초과의 실제 응답** (실측) — `data` 없이 `status_code` 만 온다.
+
+```
+HTTP 413   {"status_code": "TOO_LARGE_REQUEST"}
+```
+
+> **운영 코드는 두 층으로 검사한다.** ① HTTP 상태가 200 인가 ② 바디에 `status_code == "OK"` 가 있는가. 인증 실패는 `status_code` 키 자체가 없으므로 `body.get("status_code")` 만 보면 `None` 을 정상으로 오판할 수 있다. 그 외 응답은 **바디 원문을 그대로 로그에 남긴다.**
 
 ---
 
@@ -253,15 +281,25 @@ Swagger 원문: *"에러 종류에 따라 status code가 400, 411, 413, 500 으�
 | ❌ `params=` 에 **Encoding 키** | | `%` 가 `%25` 로 **이중 인코딩** |
 | ❌ 조립 URL 에 **Decoding 키** | | 쿼리의 `+` 가 **공백**으로 해석됨 |
 
+**가장 안전한 방법 — 어느 형태를 받았는지 따지지 않고 `unquote` 로 정규화한다.** 실측으로 확인했다.
+
 ```python
-# requests — Decoding 키 + params
+import urllib.parse, requests
+
+# 받은 키가 Encoding 이든 Decoding 이든 항상 Decoding 형태로 맞춘다.
+#   Decoding 키의 문자집합은 base64(A-Za-z0-9+/=) 라 '%' 가 없다 → unquote 는 무연산.
+#   '+' 를 공백으로 바꾸는 것은 unquote_plus 지 unquote 가 아니다 → 훼손되지 않는다.
+key = urllib.parse.unquote(raw_key)
+
 resp = requests.post(
     "https://api.odcloud.kr/api/nts-businessman/v1/status",
-    params={"serviceKey": SERVICE_KEY_DECODED, "returnType": "JSON"},
+    params={"serviceKey": key, "returnType": "JSON"},   # 여기서 1회 인코딩된다
     json={"b_no": ["0000000000"]},
     timeout=15,
 )
 ```
+
+> 이 정규화가 실제로 필요했다. 2026-09-17 검증에서 포털이 준 키는 **Encoding 형태**(98자, `%` 5개)였고 그대로 `params=` 에 넣으니 `%` 가 `%25` 로 이중 인코딩되어 **전 호출이 `HTTP 401 {"code":-4}`** 였다. `unquote` 로 88자 Decoding 형태로 바꾸자 전부 통과했다. `scripts/nts/probe.py` 의 `load_key()` 가 이 처리를 하며 어느 형태를 받았는지 출력에 찍는다.
 
 > ⚠ 키 발급 직후 **1시간 내**에는 정상 키도 인증 오류가 날 수 있다. 해당 API 를 **활용신청하지 않은** 경우에도 같은 오류로 보인다.
 > ⚠ `httpx` 는 쿼리 인코딩에서 `+` 를 safe 문자로 둘 수 있어 `requests` 와 다르게 동작할 소지가 있다(**미확인**). 첫 배포 전에 실제 응답으로 1회 검증한다.
@@ -336,7 +374,33 @@ resp = requests.post(
 
 ## 9. 검증
 
-스펙 확보는 웹 조사이므로 재현 명령은 문서 회수다. **API 는 호출하지 않았다.**
+### 9.1 실호출 검증 (2026-09-17 수행)
+
+```bash
+# 키는 환경변수 또는 파일로만 넘긴다. 명령행 인자로 넘기지 않는다 —
+# ps 로 다른 프로세스에 보이고 셸 히스토리에도 남는다.
+NTS_SERVICE_KEY_FILE=~/.setive/nts_key.txt python3 scripts/nts/probe.py
+```
+
+6종 전부 통과. 결과는 위 각 절에 반영했다.
+
+| # | 항목 | 결과 |
+|:-:|---|---|
+| 1 | 잘못된 키 | `401` `{"code":-4,"msg":"등록되지 않은 인증키 입니다."}` → §4.4 |
+| 2 | `/status` 필드 집합 | Swagger 11필드와 **완전 일치** (초과 0 · 누락 0) |
+| 3 | `utcc_yn` 실물 | 수신 확인 (`"N"`) |
+| 4 | 미등록 번호 | 다른 필드 전부 빈 문자열, `match_cnt 2 / request_cnt 3` → §4.1 |
+| 5 | 101건 요청 | `413` `{"status_code":"TOO_LARGE_REQUEST"}` → §4.4 |
+| 6 | `/validate` 불일치 | `valid:"02"` + `valid_msg` + `request_param`. **`status` 키 없음** → §1 |
+
+> `valid=01`(일치) 경로는 **미실측**이다. 실제 대표자성명·개업일자를 국세청에 보내야 하고
+> 그것은 §5.1 이 "최초 등록 시 1회만" 으로 제한한 개인정보 전송이다. 테스트 목적으로
+> 임의로 보내지 않았다. 일치 시 `status` 가 포함된다는 것은 Swagger `info.description`
+> (*"일치할경우, valid: 01 및 해당하는 사업자 정보 return"*)에 근거한 **서술 기반**이다.
+
+### 9.2 스펙 문서 재확인
+
+
 
 ```bash
 # 1. Swagger 원문 재확인 — 이 문서의 모든 필드명·enum 의 1차 출처
@@ -369,8 +433,9 @@ curl -s 'https://infuser.odcloud.kr/api/stages/28493/api-docs' \
 
 ## 10. 알려진 한계
 
-- **API 를 한 번도 호출하지 않았다.** 이 문서는 전부 스펙·메타·약관 문서 독해다. 실호출로만 확인되는 것(오류 봉투 형태, 응답 지연, 점검 시간대)은 미확인이다.
-- **`api.odcloud.kr` 게이트웨이의 인증 실패 응답 형태가 미확인이다.** 웹에 흔한 `OpenAPI_ServiceResponse`/`cmmMsgHeader` 봉투는 `apis.data.go.kr` 계열의 포맷이고 이 호스트와 같은지 확인하지 못했다. 그래서 §4.4 가 "`status_code == "OK"` 를 검사하고 나머지는 원문 로그" 로 방어적으로 적혀 있다.
+- **`valid=01`(진위확인 일치) 경로가 미실측이다.** 실제 대표자성명 전송이 필요해 하지 않았다. 일치 시 `status` 가 함께 오는지는 Swagger 서술에 근거한다. M4 착수 시 **테넌트 자기 회사 정보로** 1회 확인하는 것이 맞다 — 남의 대표자명을 테스트에 쓰지 않는다.
+- **응답 지연·점검 시간대·간헐적 5xx 는 미확인이다.** 4종 호출이 전부 즉시 응답했을 뿐 부하·시간대별 거동은 모른다.
+- **`httpx` 의 `+` 인코딩 거동은 여전히 미확인이다.** §6.1 의 `unquote` 정규화를 쓰면 `%` 가 사라져 이 쟁점 자체가 약해지지만, httpx 로 갈 거면 1회 확인한다.
 - **운영계정 전환 후 트래픽 한도가 공시되지 않았다.** 개발계정 100만건으로 충분하다는 판단이라 당장 문제는 없다.
 - **개인회원으로 상용 SaaS 에 탑재할 때의 추가 제약이 미확인이다.** 약관에 금지 문구는 없었으나, 키 소유주체와 서비스 운영주체를 일치시키는 편이 안전하다(담당자 이직 리스크). 사업자등록 후 **기업회원 + 프로젝트 서비스키** 전환을 권한다 — 강제는 아니다.
 - **개인정보보호법상 대표자성명 처리근거를 1차 출처로 확인하지 않았다.** `/validate` 를 쓰기 전에 법률 검토가 필요하다. `/status` 만 쓰면 이 쟁점이 발생하지 않는다.

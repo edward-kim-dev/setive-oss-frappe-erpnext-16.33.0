@@ -357,12 +357,39 @@ python3 scripts/identifiers/selftest.py     # 앱 저장소 루트에서. exit 0
 
 | 함수 | 반환 |
 |---|---|
-| `validate_brn(value)` | `bool`. **체크섬 + 구분코드 실재 여부**. 하이픈 허용 |
-| `validate_crn(value)` | `bool`. 체크섬만 — CRN 구조 표는 ONT 에 없다 |
+| `check_brn(value)` · `check_crn(value)` · `check_rrn(value)` | **`Result`** — 판정과 **이유**를 함께. 주 API |
+| `validate_brn(value)` · `validate_crn(value)` | `bool`. 위 결과의 `.ok` 를 꺼내는 얇은 래퍼 |
+| `brn_type_code(value)` · `brn_type_label(value)` | 사업자유형 구분코드(4~5번째 자리)와 한국어 해석 |
 | `brn_check_digit(value)` · `crn_check_digit(value)` | `int \| None`. 앞자리로 검증번호를 계산 |
 | `brn_quotient_term(d)` | `int`. 산식의 독립 항 `(d × 5) // 10`. 따로 검산 가능해야 해서 노출한다 |
-| `normalize_brn` · `normalize_crn` · `normalize_branch_code` | 정규형 또는 **원본 그대로** |
+| `normalize_brn` · `normalize_crn` · `normalize_rrn` · `normalize_branch_code` | 정규형 또는 **원본 그대로** |
 | `digits_only(value)` | **ASCII** 숫자만 남긴 문자열 |
+
+`Result` 는 `status`(`Status` enum) · `normalized` · `expected_check_digit` · `type_code` 를 싣고
+`bool(result)` 가 `status is OK` 다. `Status` 는 `ok · empty · non_numeric · length · type_code ·
+checksum · unverifiable` 일곱 가지다.
+
+**`bool` 이 아니라 결과 객체인 이유** — `validate_*` 만 있으면 호출부가 "왜 거부됐나" 를 알려고
+길이·형식·체크섬을 **다시 계산**하게 되고, 그러면 산식이 두 곳에 생겨 갈라진다.
+`party_identity` 는 이제 `_VERDICT_BY_STATUS` 매핑표 하나로 정책을 표현하고 산술을 전혀 하지 않는다.
+
+**`unverifiable` 은 `False` 가 아니다.** 주민등록번호는 2020-10 이후 발급분의 뒤 6자리가
+임의번호라 종전 검증식이 성립하지 않는다([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md):77).
+무효로 접으면 호출부가 hard block 을 만들어 **2020-10 이후 발급된 정상 번호를 가진 개인
+공급받는자가 등록 자체를 못 하게 된다.** `check_rrn` 은 자릿수만 보고 `UNVERIFIABLE` 을 돌려주며,
+호출부는 `result.ok`(막을까)와 `result.unverifiable`(경고만 할까)을 나눠 본다.
+⚠ 이 함수가 있다고 주민등록번호를 **저장하는 것은 아니다** — 필드 신설은 여전히 1차 범위 밖이고
+사람 승인 대상이다(아래 「주민등록번호를 1차에 만들지 않는다」).
+
+구분코드 해석표는 [ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md) §1.1
+그대로다 — `01~79` 개인 과세 · `80` 법인 아닌 단체·다단계판매원 · `81·86·87·88` 영리법인 본점 ·
+`82` 비영리법인 · `83` 국가·지자체 · `84` 외국법인 · `85` 영리법인 지점 · `89` 법인 아닌 종교단체 ·
+`90~99` 개인 면세. **과세유형 추론에 쓸 수 있으나 국세청 조회로 얻는 관측값과 다를 수 있다** —
+과세유형 전환은 사업자등록번호를 바꾸지 않는다. 둘을 같은 칸에 담지 않는다.
+
+> 사업자등록번호와 법인등록번호는 **서로 독립된 식별자이며 변환 관계가 없다**
+> ([ONT-ENT-002](../ontology/ONT-ENT-002_korean_tax_party_and_transaction_axes.md):73).
+> 한쪽에서 다른 쪽을 유도하는 코드를 만들지 않는다.
 
 > ⚠ **정규화 함수는 정규화할 수 없는 값을 `None` 이 아니라 원본 그대로 돌려준다.** `doc.tax_id = normalize_brn(doc.tax_id)` 가 자연스러운 호출인데 여기서 `None` 을 돌려주면 해외 거래처의 VAT 번호가 **저장 시점에 소실된다.** 보존이 기본값이어야 그 사고가 안 난다.
 
@@ -379,7 +406,15 @@ python3 scripts/identifiers/selftest.py     # 앱 저장소 루트에서. exit 0
 - **사업자등록번호**: 9번째 자리가 **두 번** 쓰인다 — 가중합의 `w[8]=5` 로 한 번, `(d[8] × 5) // 10` 몫 항으로 또 한 번. 이 항을 빠뜨리면 검증번호가 10개 중 약 절반에서만 우연히 맞는다.
 - **법인등록번호**: 곱이 10 을 넘어도 **자릿수를 분해하지 않는다.**
 
-selftest 는 순환 검증을 피하려고 다섯 갈래로 나눴다 — ① 손계산 벡터(가중합·몫 항·검증번호를 중간값까지 단언) ② 구조 속성(앞자리마다 검증번호 10개 중 정확히 1개만 통과, `validate` 와 `check_digit` 교차검증) ③ 독립 작성한 참조 구현과의 차분 대조 **144,900건** ④ 정규화·경계값(비-ASCII·구분코드 00 포함) ⑤ `fixture_company.py` 의 BRN/CRN 상수를 **파일에서 읽어** 검산.
+selftest 는 순환 검증을 피하려고 일곱 갈래로 나눴다 — ① 손계산 벡터(가중합·몫 항·검증번호를 중간값까지 단언) ② 구조 속성(앞자리마다 검증번호 10개 중 정확히 1개만 통과, `validate` 와 `check_digit` 교차검증) ③ 독립 작성한 참조 구현과의 차분 대조 **144,900건** ④ 정규화·경계값(비-ASCII·구분코드 00 포함) ⑤ **자리 변조**(각 자리 ±1 전량 거부 80건 · `d[8]` ±2/±4/±6/±8 16건) ⑥ 결과 API·구분코드·주민등록번호 ⑦ `fixture_company.py` 의 BRN/CRN 상수를 **파일에서 읽어** 검산.
+
+> ⚠ **`d[8]` 짝수 변조가 캐리항의 존재 이유다.** `w[8]=5` 라 `d[8]` 을 ±2/±4/±6/±8 바꾸면
+> 가중합 변화가 `5Δ ≡ 0 (mod 10)` 이 되어 **가중합만으로는 전혀 구별되지 않는다.**
+> `(d[8] × 5) // 10` 캐리항이 유일한 방어다. selftest 는 "가중합은 같다" 와 "그래도 거부된다" 를
+> **둘 다** 단언하며, 캐리항을 지운 사본에서 이 검사가 실제로 실패하는 것을 확인했다.
+
+외부 검산 벡터 3건을 A절에 박아 두었다 — BRN `1248100998`→8 · `2208162517`→7 ·
+CRN `1301110006246`→6. 구현이 만든 숫자가 아니라 독립 출처이므로 순환 검증 회피에 직접 기여한다.
 
 > ⚠ **차분 코퍼스는 자릿수 커버리지를 스스로 점검한다.** 초판은 일련번호 4자리를 `range(10)` 으로 돌면서 `:04d` 로 찍어 앞 3자리가 전 케이스에서 `0` 으로 고정됐고, 그 결과 `BRN_WEIGHTS[5]·[6]·[7]` 이 **한 번도 발현하지 않았다** — 실번호의 50% 를 오판하는 가중치 변조가 selftest 를 통과했다(뮤테이션으로 실증). 지금은 순회 보폭을 실측으로 고르고 10자리 전부에서 0~9 가 나오는지 단언한다. 건수가 아니라 **커버리지**가 이 절의 유일한 실패 모드다.
 >

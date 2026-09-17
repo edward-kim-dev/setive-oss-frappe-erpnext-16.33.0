@@ -36,6 +36,7 @@ SETIVE ERP(ERPNext 16.33 포크)의 설계·구현 지식 저장소입니다.
 | [KB-KOR-007](./kb/KB-KOR-007_bank_reconciliation.md) | 은행 입금 대사 아키텍처 — 팝빌 계좌조회에서 오픈뱅킹으로 가는 경로 | 한국화 |
 | [KB-OPS-003](./kb/KB-OPS-003_popbill_partner_onboarding.md) | 팝빌 파트너 가입 실행 가이드 — 사업자등록 전부터 첫 실발행까지 | 운영·배포 |
 | [KB-KOR-008](./kb/KB-KOR-008_etax_vendor_adapter_contract.md) | 전자세금계산서 어댑터 계약 — 모듈 경로·DocType·포트·상태축·관리번호 단일화 | 한국화 |
+| [KB-KOR-010](./kb/KB-KOR-010_nts_business_status_api.md) | 국세청 사업자등록 진위확인·상태조회 API — 스펙·약관·설계 함의 | 한국화 |
 
 ### ONT — 온톨로지 입력물
 

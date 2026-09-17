@@ -8,13 +8,14 @@ applies_to:
   - data.go.kr/data/15081808
   - setive_erpnext_kr@0.0.1
 verified_on: 2026-09-17
-verified_by: 사용자 제공 Swagger(infuser.odcloud.kr/api/stages/28493/api-docs) 전문 독해 + data.go.kr 데이터셋 메타·이용정책·이용약관·공공누리 원문 대조 + 기존 KB 4종 한 항씩 재검증 + **개발키로 실호출 6종 검증**(scripts/nts/probe.py, 2026-09-17). valid=01 경로는 실제 대표자성명 전송이 필요해 미실측
+verified_by: 순수 파서 selftest 6절 + 뮤테이션 8종 전부 사망 + 실 API 왕복(2026-09-17) + 사용자 제공 Swagger(infuser.odcloud.kr/api/stages/28493/api-docs) 전문 독해 + data.go.kr 데이터셋 메타·이용정책·이용약관·공공누리 원문 대조 + 기존 KB 4종 한 항씩 재검증 + **개발키로 실호출 6종 검증**(scripts/nts/probe.py, 2026-09-17). valid=01 경로는 실제 대표자성명 전송이 필요해 미실측
 related: [KB-KOR-005, KB-KOR-003, KB-KOR-008, ONT-ENT-002, KB-OPS-002]
 ---
 
 # KB-KOR-010: 국세청 사업자등록 진위확인·상태조회 API
 
-> **상태**: 스펙 확보 + **실호출 검증 완료**, 파서·어댑터 구현 미착수. 파서·어댑터는 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M4** 소관이다.
+> **상태**: 스펙 확보 + 실호출 검증 + **순수 파서 구현·검증 완료**(`korea/common/nts_bizinfo.py`).
+> frappe 쪽 기록(로그 append·캐시 갱신)과 리포트 컬럼은 미착수 — 사이트가 필요하다. 파서·어댑터는 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M4** 소관이다.
 > 이 문서는 그 착수 전에 확정해야 할 사실만 담는다.
 > ⚠ **이 문서는 기존 KB 4종의 서술을 정정한다** — §8 을 먼저 읽는다.
 
@@ -398,7 +399,31 @@ NTS_SERVICE_KEY_FILE=~/.setive/nts_key.txt python3 scripts/nts/probe.py
 > 임의로 보내지 않았다. 일치 시 `status` 가 포함된다는 것은 Swagger `info.description`
 > (*"일치할경우, valid: 01 및 해당하는 사업자 정보 return"*)에 근거한 **서술 기반**이다.
 
-### 9.2 스펙 문서 재확인
+### 9.2 파서 검증 (사이트 없이 완결)
+
+```bash
+python3 scripts/nts/selftest.py       # 네트워크·frappe 없이. exit 0 이면 통과
+```
+
+`korea/common/nts_bizinfo.py` 는 `identifiers.py` 와 같은 이유로 **frappe 비의존**이다 —
+응답 파싱과 판정은 컨테이너 없이 검산 가능해야 한다. HTTP 전송을 주입 가능하게 두어
+selftest 가 네트워크 없이 돈다.
+
+픽스처를 두 등급으로 표기한다. 섞으면 "실측이라 믿었는데 지어낸 것" 이 된다.
+
+| 등급 | 무엇 | 검증 항목 |
+|---|---|---|
+| **[실측]** | 2026-09-17 `probe.py` 응답을 글자 그대로 | 인증 실패 · 한도 초과 · 정상 3건 · `valid=02` |
+| **[구성]** | 실측 불가라 스펙대로 만든 것 | 실제 폐업 · 형식적 폐업 · `tax_type_cd` 07 · `valid=01` |
+
+2026-09-17 실행: 6절 전부 통과, exit 0. 추가로 **실 API 왕복**으로 픽스처 충실성을 확인했다 —
+실 응답의 키 집합이 픽스처와 일치하고, 파서를 통과한 결과가 기대와 같았다.
+
+**뮤테이션 8종을 사본에 가해 전부 exit≠0 으로 죽는 것**을 확인했다. 단언이 헛돌지 않는다는
+증거다 — `utcc_yn` 조건 제거 · `07`→영수증 · 미등록을 문자열 매칭으로 · 인증실패를
+`status_code` 로만 판정 · 키 정규화 제거 · 폐업일 비교 반전 · 상한 100→1000 · 상한 초과 시 호출.
+
+### 9.3 스펙 문서 재확인
 
 
 

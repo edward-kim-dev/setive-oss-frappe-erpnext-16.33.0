@@ -7,8 +7,8 @@ applies_to:
   - erpnext@16.33.0
   - frappe@v16
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-16
-verified_by: frappe/erpnext 코어 소스 확인(Bank Account · move_plaid_settings_to_doctype · company.json) + KB-OPS-001 배포 모델 대조 + 팝빌/볼타 환경분리 문서 확인(2026-09-15) + 정체성 키·신원 필드 소유권 재검토 후 정정 2건(2026-09-16, §13)
+verified_on: 2026-09-17
+verified_by: frappe/erpnext 코어 소스 확인(Bank Account · move_plaid_settings_to_doctype · company.json) + KB-OPS-001 배포 모델 대조 + 팝빌/볼타 환경분리 문서 확인(2026-09-15) + 정체성 키·신원 필드 소유권 재검토 후 정정 2건(2026-09-16, §13) + 국세청 조회 키 구조 구현·실조회 검증, OwnGo 프로비저닝 코드 대조(2026-09-17, §15)
 related: [KB-OPS-001, KB-KOR-006, KB-KOR-007, KB-KOR-005, KB-KOR-008]
 ---
 
@@ -248,7 +248,7 @@ $X execute frappe.client.get_value \
 # → 별표 문자열만 반환되어야 한다
 
 # 3. fixtures 로 값이 새지 않는지
-$X export-fixtures && git -C ../setive_erpnext_kr status --short
+$X export-fixtures && git -C ../setive-erpnext-kr status --short
 # → Korea Integration * 관련 파일이 나오면 안 된다
 
 # 4. 오발행 가드레일 — 연동 레코드 없는 Company 로 발행 시도 시 차단되는가
@@ -272,6 +272,124 @@ $X execute frappe.client.get_count \
 ```
 
 ---
+
+## 15. 국세청 조회 키 — SETIVE 가 보관하고 배포 때 적용한다 (2026-09-17)
+
+### 15.1 결정
+
+**국세청(공공데이터포털) 서비스키는 SETIVE 가 보관한다.** 고객사가 발급받거나 입력하지 않는다. 클라우드 배포 때 적용한다(2026-09-17 사용자 결정).
+[KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 "테넌트별 키 기본 + SETIVE 공통키 opt-in" 을 대체한다.
+
+키 하나가 모든 고객사에 걸리므로 §4 의 1층 규칙이 그대로 적용된다 — **고객사 사이트에 복제하지 않는 것이 목표**이고, site_config 복제는 게이트웨이 전까지의 임시 방편이다.
+
+### 15.2 두 방식 — 앱은 둘 다 받는다
+
+| 방식 | 고객사 사이트가 가진 것 | 키가 있는 곳 | 상태 |
+|---|---|---|---|
+| **게이트웨이** (목표) | 게이트웨이 주소 + **고객사별 토큰** | SETIVE 백엔드만 | 앱 구현 완료, 게이트웨이(OwnGo) 미구현 |
+| **직접** (임시) | 서비스키 | 모든 고객사 서버 | 앱 구현·실조회 검증 완료 |
+
+site_config 키 — **사이트 단위**로만 쓴다(`-g` 금지):
+
+| 키 | 뜻 |
+|---|---|
+| `setive_nts_gateway_url` | 게이트웨이 주소. https 만 허용(개발 모드에서만 http) |
+| `setive_nts_gateway_token` | 고객사별 토큰. 새면 그 고객사 조회 권한만 샌다 — SETIVE 가 폐기 |
+| `setive_nts_service_key` | 포털 서비스키(직접 방식). Encoding/Decoding 어느 형태든 받는다 |
+| `setive_nts_access` | `gateway` / `direct` / `off`. 생략하면 위 값의 유무로 정한다(게이트웨이 우선) |
+
+해석은 [`korea/common/nts_access.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/nts_access.py) 한 곳이다.
+
+- **설정이 없으면 조회를 끈다**(fail-closed). 조회는 저장 경로에 걸려 있지 않으므로(KB-KOR-005 §4.2 — 결과로 저장을 막지 않는다) 꺼진 상태가 업무를 막지 않는다. 화면에는 "SETIVE 운영팀에 문의" 문구만 뜬다.
+- **`setive_integration_env` 로 막지 않는다.** 국세청 API 는 샌드박스가 없고 읽기 전용이다(§5.1 의 fail-safe 를 그대로 적용하면 키가 있어도 모든 사이트에서 조회가 꺼진다).
+- 인증 실패는 10분, 한도 초과는 5분, 서버·연결 장애는 2분 동안 **그 사이트의 호출을 멈춘다**. 한 키를 모든 고객사가 쓰는 동안 한 사이트의 반복 실패가 공용 한도를 태우지 않게 한다. 인증 실패·한도 초과는 Error Log 에 남긴다 — 키는 가리고(`앞 4자…뒤 2자 (len)`), 시각은 UTC.
+- 키는 URL 쿼리로 가므로 직접 방식에서는 URL 을 기록하는 모든 계층이 키를 본다. 앱은 전송 예외 문자열에서 키를 가린다(`nts_bizinfo.scrub`). 게이트웨이 방식에서는 토큰이 헤더로 가고 URL 에 비밀값이 없다.
+- **전송 계층은 어떤 경우에도 예외를 던지지 않는다.** 예외가 frappe 까지 가면 추적 정보에 지역 변수가 찍히는데, `url`·`headers` 는 frappe 의 가리기 목록(password·secret·token·key 등)에 없는 이름이라 평문으로 Error Log 에 남는다(2026-09-17 리뷰에서 재현). 오류 본문 읽기 실패까지 결과로 바꾼다.
+- **리다이렉트를 따라가지 않는다.** urllib 기본 동작은 3xx 를 따라가며 `Authorization` 헤더를 복사해 보낸다 — 게이트웨이 앞단의 잘못된 리다이렉트 하나로 토큰이 http·다른 호스트로 간다.
+
+### 15.3 게이트웨이 계약 — SETIVE 백엔드(OwnGo)가 구현할 것
+
+```
+POST {setive_nts_gateway_url}/status      본문·응답 = 국세청 /status 와 동일 (통과)
+POST {setive_nts_gateway_url}/validate    본문·응답 = 국세청 /validate 와 동일 (통과)
+Authorization: Bearer <고객사 토큰>
+```
+
+- 토큰 → 고객사(org) 식별. 토큰 폐기·재발급이 가능해야 한다.
+- 고객사별 호출 한도를 넘으면 **HTTP 429** — 앱은 이를 `RATE_LIMITED` 로 분류하고 5분 멈춘다.
+- 서비스키는 게이트웨이 프로세스만 읽는다. 요청 URL·키를 로그에 남기지 않는다.
+- 국세청 장애 시 차단기(circuit breaker)를 게이트웨이에 둔다 — 기계 판독 가능한 장애 공지가 없다(KB-KOR-010 §10).
+- `/validate` 는 대표자성명(개인정보)을 싣는다. 게이트웨이가 요청 본문을 저장하지 않는다(KB-KOR-010 §5.1).
+- 키 교체는 게이트웨이 한 곳에서 끝난다. 새 키는 발급 후 최대 1시간 401 이 날 수 있으므로(KB-KOR-010 §6.1) 교체 전에 새 키로 검증 호출을 먼저 한다(KB-KOR-008 §10 의 세대 모델).
+- "서비스키를 타인과 공유 금지" 약관 조항(KB-KOR-010 §5, 미확인)에 대해서도 게이트웨이가 안전하다 — 키를 쓰는 주체가 SETIVE 하나다.
+
+### 15.4 주입 경로 — OwnGo 프로비저닝 코드 대조 (2026-09-17, 읽기 전용)
+
+OwnGo 저장소 `~/DeathStar/02_CoreSection/01_Development/SideProjects/OwnGo` (이하 경로는 `backend/src/main/java/com/setive/backend/` 기준)를 읽은 결과 **오늘 사이트 설정에 앱용 키를 쓰는 코드는 없다.**
+
+| 사실 | 근거 |
+|---|---|
+| 고객사 = 조직 × 서비스 유형, Lightsail VM 1대(`setive-<serviceType>-<orgId>`) | `provisioning/ProvisioningNaming.java:22-44` |
+| 상태기계 requested → provisioning → booting → ready (15초 주기) | `provisioning/ProvisioningReconciler.java:62-161, 178-198` |
+| 비밀값은 슬롯 단위로 암호화 저장(org·serviceType·slot 컨텍스트). 실제 주입되는 슬롯은 `app_admin` 하나 | `common/DbSecretStore.java:56-58`, `provisioning/ErpnextV16UserData.java:56-58` |
+| `service_token`(api_key/secret) 슬롯은 선언만 있고 미구현(M25) | `provisioning/ErpnextV16Credentials.java:34-65` |
+| VM 부팅 스크립트(user-data)는 **평문**이고 `set -eux` 라 변수 전개가 cloud-init 로그에 찍힌다 | `provisioning/ErpnextV16UserData.java:83-90`, `provisioning/LightsailProvisioner.java:55` |
+| 부팅 뒤 정착 단계는 SSM `AWS-RunShellScript` 로 보낸다 — **명령 본문이 AWS 명령 이력에 남는다** | `preview/ErpnextV16ImageBoot.java:221-301`, `ops/SsmNodeChannel.java:69-95` |
+| 정착 단계는 `bench --site all …` — 사이트 이름은 upstream pwd.yml 의 `frontend` 이며 인스턴스 이름이 아니다(javadoc 과 다름) | `preview/ErpnextV16ImageBoot.java:58-59, 111`, `provisioning/ErpnextV16UserData.java:32-33` |
+| 운영자 설정 축(`axis_operator_config`)은 "부분·미조사(M42)" | `docs/setive/contracts/service-type-contract.md:72` |
+
+**그래서 지켜야 할 것:**
+
+1. **user-data 와 SSM 명령 본문에 비밀값을 싣지 않는다.** 둘 다 평문으로 남는다.
+2. 게이트웨이 방식이면 VM 에 가는 비밀값은 **고객사 토큰 하나**다. 서비스키는 VM 에 가지 않는다.
+3. 넣는 위치는 정착 단계 목록(`ErpnextV16ImageBoot.settleSteps`)의 **migrate 뒤, restart 앞**이다. 명령은 `bench --site all` 이 아니라 사이트를 지정하거나(`--site frontend`), 사이트 목록을 돌며 사이트 단위로 쓴다.
+4. 값 전달 경로 후보 — OwnGo 결정 사항:
+   - (a) AWS Parameter Store SecureString 에 두고, 노드에서 `aws ssm get-parameter --with-decryption` 으로 읽어 파이썬으로 site_config 에 쓴다(명령 본문에는 파라미터 **이름**만). 노드 역할(`setive-ssm-hybrid-node`)이 모든 노드에 공통이므로 **고객사별 토큰은 경로별 권한 분리**가 필요하다.
+   - (b) 토큰을 짧은 수명의 1회용 교환 코드로 바꿔, 노드가 게이트웨이에서 토큰을 받아 가게 한다(pull).
+5. **사이트에 쓰는 정식 진입점**은 앱이 제공한다 — 비밀값을 **표준입력**으로 받는다(2026-09-17 추가).
+   ```bash
+   # 게이트웨이: 표준입력 1줄 주소, 2줄 토큰 · 직접: 표준입력 1줄 서비스키 · 끄기: 표준입력 없음
+   ... | bench --site <site> execute setive_erpnext_kr.korea.common.nts_access.configure_from_stdin
+   ... | bench --site <site> execute setive_erpnext_kr.korea.common.nts_access.configure_from_stdin --kwargs "{'mode': 'direct'}"
+   bench --site <site> execute setive_erpnext_kr.korea.common.nts_access.configure_from_stdin --kwargs "{'mode': 'off'}"
+   ```
+   성공: 종료 코드 0, 출력 `{"configured": true, "mode": …, "endpoint": "…(가림)", "problem": ""}`. 입력 오류: 종료 코드 2, 표준오류 한 줄(`bench execute` 가 예외를 eval 재시도로 가리므로 예외를 쓰지 않는다). `--site all` 금지 — 표준입력은 첫 사이트만 읽는다. `bench set-config` 에 값을 인자로 넘기지 않는다.
+6. 적용 뒤 정착 단계의 검증으로 `bench --site <site> execute setive_erpnext_kr.korea.common.nts_access.verify` 를 부른다 — 출력에 비밀값이 없다.
+
+> 이 절은 SETIVE 앱 쪽 계약과 OwnGo 쪽 **요구사항**이다. OwnGo 코드는 수정하지 않았다(다른 저장소·다른 언어).
+
+### 15.5 운영 점검
+
+```bash
+# 현재 방식 — 비밀값 없음. 기대: {"mode": "gateway"|"direct", "endpoint": "…(가림)", "problem": "", …}
+bench --site $SITE execute setive_erpnext_kr.korea.common.nts_access.describe
+# 실제 1건 조회(공개 대기업 번호). 기대: {"ok": true, "outcome": "ok", "matched": 1, …}
+bench --site $SITE execute setive_erpnext_kr.korea.common.nts_access.verify
+# 인증 실패·한도 초과 기록
+bench --site $SITE mariadb -e "select creation, method from \`tabError Log\` where method like 'SETIVE: 국세청%' order by creation desc limit 5"
+```
+
+직접 방식의 키 교체는 **모든 고객사 사이트에 다시 넣어야 한다**(반영은 워커당 최대 60초). 게이트웨이 방식은 게이트웨이 한 곳이다.
+
+### 15.6 로컬 개발
+
+키 파일은 저장소 밖(`~/.setive/nts_key.txt`, 0600)에 둔다. 사이트 설정에는 **표준입력으로만** 넣는다 — 명령행 인자는 `ps`·셸 히스토리에 남는다.
+
+```bash
+docker compose -f $COMPOSE cp ../setive-erpnext-kr/scripts/nts/set_site_access.py backend:/tmp/set_site_access.py
+docker compose -f $COMPOSE exec -T -w /home/frappe/frappe-bench/sites backend \
+  /home/frappe/frappe-bench/env/bin/python /tmp/set_site_access.py localhost direct < ~/.setive/nts_key.txt
+# → 직접 방식으로 설정: kWaX…== (len=88)   (Encoding 형태로 줘도 Decoding 으로 정규화해 저장)
+```
+
+`show` · `gateway`(표준입력 2줄: 주소·토큰) · `clear` 도 있다. 내부적으로 §15.4 의 `configure_from_stdin` 을 부른다. 2026-09-17 이 경로로 로컬 사이트에 넣고 실조회까지 확인했다(KB-KOR-003 §9.5).
+
+### 15.7 남은 것
+
+- **OwnGo 구현** — 게이트웨이(§15.3), 고객사 토큰 발급·주입(§15.4). 앱 쪽은 설정값만 들어오면 동작한다.
+- **키 명의** — 현재 키는 개인 회원 계정으로 발급됐다. 사업자등록 후 법인 회원 키로 옮긴다(KB-KOR-010 §10).
+- **한도 단위** — 개발계정 일 100만 건이 키 단위인지 계정 단위인지, 운영계정 한도는 얼마인지 미확인(KB-KOR-010 §6).
+- **`.gitignore`** — 앱 저장소에 비밀 파일 가드가 없다. 키 파일을 저장소 안에 두지 않는 규칙에만 기대고 있다.
 
 ## 13. 이전 서술 정정
 

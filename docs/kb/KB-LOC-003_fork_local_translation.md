@@ -67,7 +67,7 @@ Frappe 의 `__(txt, replace, context)` 는 `frappe._messages["<msgid>:<msgctxt>"
 - **`bench update-po` 를 이 파일에 실행하지 않습니다.** babel 의 obsolete 처리로 소스에서 추출되지 않는 수동 msgid(= frappe 코어 문자열 재정의분)가 삭제됩니다.
 - 항목마다 `# 원본 위치: <경로>:<라인>` 주석을 답니다. 앱이 아니라 포크·frappe 소스를 가리키는 경우가 대부분이라 이 주석이 유일한 역참조입니다.
 - 중복 키는 만들지 않습니다 — §7 의 함정이 그대로 적용됩니다.
-- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 10블록 124엔트리(중복 0):
+- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 12블록 211엔트리(2026-09-17 기준):
 
 | 블록 | 블록 내 정렬 | 내용 |
 |---|---|---|
@@ -81,6 +81,8 @@ Frappe 의 `__(txt, replace, context)` 는 `frappe._messages["<msgid>:<msgctxt>"
 | 필수·형식 검증 모달 | — | `field_group.js` · `data.js` 6건 |
 | 테마 전환 다이얼로그 | — | `theme_switcher.js` 8건 + `desk_theme` 형제 옵션 2건 |
 | Fieldtype Select 오염 가드 | — | `msgctxt` 4건, `msgstr` 이 원문과 같음 (§10.4) |
+| 한국 세무 신원 · 폼 탭 라벨 | 폼별 | 고객·공급업체·회사 탭·섹션 라벨(폼 DocType `msgctxt`), 첫 탭 `Details`·`Connections`(무맥락), 앱 DocType·리포트 이름, Select 표시값(저장값은 그대로) — KB-KOR-003 §9.4 |
+| upstream 오역 재정의 | — | 52건. 모든 사용처가 같은 뜻인 것만 무맥락으로, 뜻이 갈리는 `Release Date` 는 폼 컨텍스트로. `Accounts` 제외, **번역문을 레코드 이름으로 쓰는 `Sales`·`Credit Note` 제외** — KB-KOR-003 §9.5 |
 
 **컴파일은 [`Makefile`](../../Makefile) 의 `make po` 로 충분합니다.** `compile_translations(target_app=None, ...)` 은 `frappe.get_all_apps(True)` 를 순회하므로 앱 `ko.po` 도 함께 MO 로 컴파일됩니다(`frappe/gettext/translate.py:247-248`). 앱 하나만 좁혀 돌리려면(배포 스크립트 등, KB-OPS-001 §5.1):
 
@@ -184,7 +186,7 @@ babel 의 `read_po()` 는 동일 `(msgid, msgctxt)` 가 여러 번 나오면 **�
 중복 키 검사 — 두 파일 모두 기대 0건. 앱 `ko.po` 는 형제 저장소에 있습니다.
 
 ```bash
-TARGET=../setive_erpnext_kr/setive_erpnext_kr/locale/ko.po   # 또는 erpnext/locale/main.pot
+TARGET=../setive-erpnext-kr/setive_erpnext_kr/locale/ko.po   # 또는 erpnext/locale/main.pot
 
 python3 - "$TARGET" <<'PY'
 import io, sys
@@ -343,7 +345,7 @@ msgstr "Password"
 컨테이너 없이 babel 라운드트립으로 MO 키 생성을 확인할 수 있습니다(스택 기동 불필요).
 
 ```bash
-APP=../setive_erpnext_kr
+APP=../setive-erpnext-kr
 docker run --rm -v "$(cd $APP && pwd):/app:ro" --entrypoint sh frappe/erpnext:v16.33.0 -lc '
 /home/frappe/frappe-bench/env/bin/python - <<PY
 from babel.messages.pofile import read_po
@@ -383,4 +385,4 @@ docker compose -f docker/development/docker-compose.yml exec backend \
 | 완료·실패 화면 8건 | `Setting up your system` · `Starting Frappe ...` · `starting the setup...` · `Refreshing...` · `Failed to complete setup` · `Could not start up:` · `Setup failed` · `Retry`. `Complete Setup` 을 누른 직후 화면이며 전부 영문이다 |
 | 죽은 엔트리 `Setup Failed` | 앱 `ko.po` 에 대문자 판이 있으나 실제 호출은 `setup_wizard.js:265` 의 소문자 `Setup failed` 다. msgid 는 바이트 일치라 지금 이 엔트리는 아무것도 번역하지 않는다 |
 | 모듈 선택 슬라이드의 `Manufacturing` → `조작` | [`erpnext/public/js/setup_wizard.js:163`](../../erpnext/public/js/setup_wizard.js) 이 `__("Manufacturing")` 을 **무맥락**으로 부르는데 `erpnext/locale/ko.po:30192` 가 `조작` 으로 번역한다. 같은 위저드의 업종 Select 는 `msgctxt "KSIC"` 로 `제조업` 이라, 한 위저드 안에서 같은 단어가 둘로 갈린다. 무맥락 엔트리를 추가하면 Manufacturing **모듈명 전역**이 함께 바뀌므로 사람 판단이 필요하다 |
-| 앵커 공백 68건 | `../setive_erpnext_kr/setive_erpnext_kr/translation_overrides.py` 가 124건 중 56건만 참조한다. 이번 34건은 넣었고, 이관분 43 + frappe 코어 25 는 아직 없다. `bench update-po --app setive_erpnext_kr` 을 돌리면 그 68건이 사라진다(`make po` 는 안전) |
+| 앵커 공백 68건 | `../setive-erpnext-kr/setive_erpnext_kr/translation_overrides.py` 가 124건 중 56건만 참조한다. 이번 34건은 넣었고, 이관분 43 + frappe 코어 25 는 아직 없다. `bench update-po --app setive_erpnext_kr` 을 돌리면 그 68건이 사라진다(`make po` 는 안전) |

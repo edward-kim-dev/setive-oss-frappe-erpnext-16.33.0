@@ -6,8 +6,8 @@ status: active
 applies_to:
   - erpnext@16.33.0
   - setive_erpnext_kr@0.0.1
-verified_on: 2026-09-16
-verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12) + 신원 필드는 코어 JSON 실측(company/customer/supplier field_order)·Custom Field 정의 정적 검산만 수행, 런타임 미검증(2026-09-16, §9.3) + 식별번호 체크섬은 scripts/identifiers/selftest.py 호스트 실행으로 검증 완료(2026-09-16)
+verified_on: 2026-09-17
+verified_by: 개발 컨테이너 E2E(회사 생성→GL 스모크→삭제, 2026-09-06) + v16.33.0 리베이스 후 코어 심볼 재대조(2026-09-07) + 차트 md5·백필 점검 기대값 재실측(2026-09-16, §12) + 신원 필드는 코어 JSON 실측(company/customer/supplier field_order)·Custom Field 정의 정적 검산만 수행, 런타임 미검증(2026-09-16, §9.3) + 식별번호 체크섬은 scripts/identifiers/selftest.py 호스트 실행으로 검증 완료(2026-09-16) + 신원 필드·리포트 런타임(migrate·fixture) 및 웹 UI(Chrome) 검증 완료, 발견 결함 수정 후 재검증(2026-09-17, §9.4)
 related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001, KB-KOR-008, KB-KOR-005, ONT-ENT-002]
 ---
 
@@ -17,7 +17,7 @@ related: [KB-KOR-002, KB-OPS-001, KB-ARCH-001, KB-KOR-008, KB-KOR-005, ONT-ENT-0
 
 한국 표준 계정과목표([KB-KOR-002](./KB-KOR-002_korean_chart_of_accounts.md))로 회사를 만들면 코어가 채우지 못하는 것이 넷 있다. 앱 `setive_erpnext_kr` 의 `Company.on_update` 훅이 회사 생성 직후 이 넷을 채운다. 포크는 건드리지 않는다.
 
-| 단계 | 모듈 (`setive_erpnext_kr/setive_erpnext_kr/korea/common/`) | 채우는 것 | 2026-09-06 실측 |
+| 단계 | 모듈 (`setive-erpnext-kr/setive_erpnext_kr/korea/common/`) | 채우는 것 | 2026-09-06 실측 |
 |---|---|---|---|
 | 1 | `company_defaults.py` | 코어가 비워 두는 Company 기본계정 12개 | 12/12 |
 | 2 | `warehouses.py` | 기본 창고 4개의 `account` + Company 창고 필드 3개 | 4 + 3 |
@@ -298,10 +298,11 @@ Company Custom Field `setive_industry_profile`(Select `manufacturing` 기본 / `
 | `setive_kr_tax_section_end` | Section Break | ✅ | | | 섹션 닫기 — 아래 참조 |
 | **소계** | | **11** | **12** | **12** | **신규 35** |
 
-> Company 에만 섹션 닫기 필드가 있다. `company.json` field_order 는 `date_of_establishment`(11) 뒤에
-> `parent_company`(12) · `reporting_currency`(13) 가 오므로, 닫지 않으면 이 둘이 「한국 세무 신원」
-> 섹션 안으로 끌려 들어간다. Customer/Supplier 는 섹션이 Tax 탭 **마지막**이고 바로 뒤가
-> `settings_tab`(Tab Break)이라 자동으로 닫힌다. (italy 도 Company 섹션을 닫지 않지만 선례가 곧 정상은 아니다.)
+> Company 에만 섹션 닫기 필드가 있다. frappe 가 Section Break 를 `date_of_establishment` 에서
+> `company_info`(Section Break) 직전까지 밀어내므로 오늘은 닫개가 빈 섹션으로 숨고 효과가 없다.
+> upstream 이 그 사이에 Date 필드를 추가하면 삽입점이 거기서 멈춰 뒤따르는 코어 필드가 섹션에 들어오는데,
+> 닫개가 그것을 막는다. Customer/Supplier 는 섹션이 세금 탭 **맨 위**에 놓이고 바로 뒤가
+> `taxation_section`(Section Break)이라 자동으로 닫힌다. 배치 규칙은 §9.4.
 
 **산술 — Custom Field 레코드는 (dt, fieldname) 쌍이다.** 같은 `fieldname` 이 3개 DocType 에 있으면 레코드는 **3개**다. 레코드 이름이 `{dt}-{fieldname}` 임은 코어가 전제한다 — [`erpnext/patches/v16_0/rename_italy_customer_name_fields.py`](../../erpnext/patches/v16_0/rename_italy_customer_name_fields.py):17·40 이 `f"Customer-{fieldname}"` 과 `"Company-fiscal_regime"` 를 따로 지목한다. 같은 이름 `fiscal_code` 가 Company·Customer·Supplier 3곳에 각각 만들어지는 것도 코어 선례다([`erpnext/regional/italy/setup.py`](../../erpnext/regional/italy/setup.py):120·207·448).
 
@@ -316,20 +317,25 @@ DocType 별 최종 — Account 7 · Company 13 · Customer 12 · Supplier 12
 잘못 통과한다"가 바로 여기서 일어난다. 별도로 전역 카운트 44 를 고정 기준선으로 함께 단언해
 정의와 DB 가 **같이** 틀리는 경우도 잡는다.
 
-`insert_after` 앵커는 DocType 마다 다르며 실측값이다. Customer 와 Supplier 가 다른 것은 오타가 아니라 **코어가 두 DocType 에서 `tax_withholding_group`/`category` 순서를 반대로 두었기** 때문이다.
+`insert_after` 앵커는 DocType 마다 다르다. 정의는 `party_identity.SECTION_ANCHOR`.
 
-| DocType | 앵커 | 근거 |
+| DocType | 앵커 | 결과 배치 (2026-09-17 실측) |
 |---|---|---|
-| Company | `date_of_establishment` | `field_order` idx 11. italy 가 `sb_e_invoicing` 을 거는 자리와 같다 |
-| Customer | `tax_withholding_category` | idx 53. Tax 탭의 **마지막** 필드 |
-| Supplier | `tax_withholding_group` | idx 42. Tax 탭의 **마지막** 필드 |
+| Company | `date_of_establishment` | 세부 정보 탭, 기본 정보 섹션 뒤(`company_info` 앞). italy 가 `sb_e_invoicing` 을 거는 자리와 같다 |
+| Customer | `tax_tab` (Tab Break) | 세금 탭 맨 위. 바로 뒤 `taxation_section` 이 섹션을 닫는다 |
+| Supplier | `tax_tab` (Tab Break) | 세금 탭 맨 위. 바로 뒤 `taxation_section` 이 섹션을 닫는다 |
+
+> ⚠ 초판 앵커(Customer `tax_withholding_category` · Supplier `tax_withholding_group` — "탭의 마지막 필드")는
+> 섹션을 다음 탭으로 보냈다(§9.4-1). 세금 탭 **끝**에 두는 표준 앵커는 없다 — 탭 안의 다른 필드는 전부 탭을
+> 넘거나 `taxation_section` 을 둘로 쪼갠다. 앵커를 바꾸면 `party_identity.layout_problems()` 로 확인한다.
 
 설계 규칙:
 
 - **`reqd` 를 절대 걸지 않는다.** §7.1 의 근거(`chart_of_accounts` 의 `ignore_mandatory`)는 Account 전용이라 여기 적용되지 않고, **더 나쁜 근거가 따로 있다** — [`erpnext/selling/doctype/quotation/quotation.py`](../../erpnext/selling/doctype/quotation/quotation.py):611-642 의 `create_customer_from_lead` 가 `frappe.MandatoryError` 를 잡아 `frappe.throw("Mandatory Missing")` 으로 바꾼다. Lead 에는 `setive_*` 가 없으므로 reqd 필드 하나가 **견적 → 수주/송장 전환 전체를 100% 막는다.**
-- **`default` 를 걸지 않는다.** 특히 `setive_tax_payer_type` 은 선행 빈 옵션(`"\n일반과세자\n…"`)을 둔다. 없으면 DB 는 `""` 인데 폼은 첫 옵션을 보여주고, 사용자가 **아무 필드나** 고쳐 저장하는 순간 과세유형이 조용히 확정된다. 과세유형은 발행 판정에 직결되므로 조용한 확정이 곧 오발행이다.
+- **`default` 를 걸지 않는다.** 특히 `setive_tax_payer_type` 은 선행 빈 옵션(`"\n01 일반과세자\n…"`)을 둔다. 없으면 DB 는 `""` 인데 폼은 첫 옵션을 보여주고, 사용자가 **아무 필드나** 고쳐 저장하는 순간 과세유형이 조용히 확정된다. 과세유형은 발행 판정에 직결되므로 조용한 확정이 곧 오발행이다.
 - **주소 필드를 만들지 않는다.** ERPNext 는 주소를 `Address` DocType 으로 모델링하고 `customer_primary_address`/`supplier_primary_address` Link 가 있다. 팝빌 `Addr`(300자)는 발행·등록 시점에 그 Address 를 평탄화해 만든다. 필드로 복제하면 두 번째 진실이 생긴다.
-- **`read_only` 는 서버에서 강제되지 않는다.** `setive_tax_status` 2필드는 캐시이고 권위는 `Korea Party Tax Status` 로그의 최신 행이다. 읽기는 `party_identity.tax_status()` 하나로 통일하고, 쓸 때는 반드시 `frappe.db.set_value(..., update_modified=False)` — 기본값 `True` 면 `modified` 가 올라가 폼을 열어 둔 사용자의 다음 저장이 `TimestampMismatchError` 로 죽는다.
+- **`read_only` 는 서버에서 강제되지 않는다.** `setive_tax_status` 2필드는 캐시이고 권위는 `Korea Party Tax Status` 로그의 최신 행이다. 읽기는 `party_identity.tax_status()` 하나로 통일하고, 쓸 때는 반드시 `frappe.db.set_value(..., update_modified=False)` — 기본값 `True` 면 `modified` 가 올라가 폼을 열어 둔 사용자의 다음 저장이 `TimestampMismatchError` 로 죽는다. 저장 경로(폼·REST·Data Import)로 들어온 값은 validate 가 이전 값으로 되돌린다(2026-09-17, `_protect_observed_cache`). `doc.save()` 로 써야 하면 `doc.flags.setive_allow_tax_status_cache = True`.
+- **설명문(description)은 회계 담당자용 도움말이다.** 문서 번호·API 필드명·fieldname·`**` 를 넣지 않는다 — frappe 는 description 을 마크다운 처리 없이 그대로 보여 준다. 근거는 코드 주석에 둔다(2026-09-17, §9.4-3).
 
 #### 검증 정책 — `warn` 기본, 거처는 `site_config`
 
@@ -345,7 +351,7 @@ bench --site $SITE set-config setive_brn_validation_policy block   # 기본은 w
 
 #### 체크섬은 `identifiers.py` 가 소유한다 (M1 — 2026-09-16 완료)
 
-체크섬·정규화는 [`korea/common/identifiers.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/identifiers.py) 소관이며 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M1 산출물**이다. `party_identity` 는 그 판정을 **정책**으로 옮기는 층이다 — 무엇을 막고 무엇을 경고할지, 어떤 값을 한국 식별번호로 볼지는 여기서 정한다.
+체크섬·정규화는 [`korea/common/identifiers.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/identifiers.py) 소관이며 [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) §4 의 **M1 산출물**이다. `party_identity` 는 그 판정을 **정책**으로 옮기는 층이다 — 무엇을 막고 무엇을 경고할지, 어떤 값을 한국 식별번호로 볼지는 여기서 정한다.
 
 **frappe 비의존이 설계 제약이다.** `identifiers.py` 는 `import frappe` 를 하지 않고 앞으로도 하지 않는다. §4.1 이 M1 을 떼어낸 이유가 이것이다 — 체크섬은 컨테이너·bench 없이 호스트에서 검산 가능해야 하고, 그 제약이 유지보수 비용을 가른다. **이 저장소에서 사이트 없이 실행되는 유일한 검증이다.**
 
@@ -443,16 +449,20 @@ CRN `1301110006246`→6. 구현이 만든 숫자가 아니라 독립 출처이�
 
 ### 7.5 「발급 불가 거래처」 리포트
 
-`Korea Etax Ineligible Parties` — 세금계산서 XML 이 요구하는 상호·대표자성명·업태·종목이 결측인 거래처와 사업자등록번호 오류를 목록으로 낸다. 폴더는 `setive_erpnext_kr/setive_erpnext_kr/report/korea_etax_ineligible_parties/`, 파일 4개(`__init__.py`·`.json`·`.py`·`.js`)이며 `.json` 의 키 집합·`is_standard`·`roles`(`Accounts User`·`Accounts Manager`·`Auditor`)는 기존 3종과 동일하다.
+`Korea Etax Ineligible Parties` — 세금계산서 XML 이 요구하는 상호·대표자성명·업태·종목이 결측인 거래처와 사업자등록번호 오류를 목록으로 낸다. 폴더는 `setive-erpnext-kr/setive_erpnext_kr/report/korea_etax_ineligible_parties/`, 파일 4개(`__init__.py`·`.json`·`.py`·`.js`)이며 `.json` 의 키 집합·`is_standard`·`roles`(`Accounts User`·`Accounts Manager`·`Auditor`)는 기존 3종과 동일하다.
 
 **리포트가 내부 함수보다 중요한 이유** — `validate` 훅은 무결성 보장 수단이 못 된다. `flags.ignore_validate=True` 로 저장하는 코어 경로가 실재하고([`erpnext/buying/doctype/request_for_quotation/request_for_quotation.py`](../../erpnext/buying/doctype/request_for_quotation/request_for_quotation.py):279-283), Data Import·REST·스케줄러 경로에서는 `msgprint` 를 아무도 보지 않는다. **실무자가 직접 보고 채우는 화면이 유일한 안전망이다.**
 
 | 필터 | 타입 | 기본 | 비고 |
 |---|---|---|---|
-| `company` | Link(Company) | 사용자 기본 회사 | **reqd 아님** — 아래 참조 |
+| `company` | Link(Company) | **없음** (2026-09-17 — 기본 회사를 넣으면 신규 거래처가 첫 화면에서 빠졌다) | **reqd 아님** — 아래 참조 |
 | `party_type` | Select | 둘 다 | 둘 다 / 고객 / 공급업체 |
-| `missing_field` | Select | 전체 | 전체 / 상호 / 대표자성명 / 업태 / 종목 / **사업자등록번호 결측** / **사업자등록번호 체크섬 오류** — 결측과 체크섬을 한 값으로 합치면 구분 요구가 필터에서 무너진다 |
+| `missing_field` (라벨 "문제 항목") | Select | 전체 | 전체 / 상호 / 대표자성명 / 업태 / 종목 / **사업자등록번호 미입력** / **사업자등록번호 무효**(검증번호·구분코드 오류와 자릿수 의심) / **법인등록번호·종사업장번호 오류** / **국세청 조회 결과 문제** |
 | `only_active` | Check | 1 | 끄면 비활성 포함. "끈 상태"와 "미지정"이 같은 뜻이라 뒤집지 않았다 |
+| `domestic_only` (라벨 "국내 거래처만") | Check | 1 | 주소·국가가 대한민국이 아닌 거래처를 뺀다. 국가 정보가 없으면 남긴다. 뺀 수는 머리말이 알린다 (2026-09-17) |
+
+컬럼(2026-09-17): 구분 · 거래처 · 상호 · 세금 ID(사업자등록번호) · 사업자등록번호 판정 · 미입력 항목 · 기타 번호 오류 · 문제 수 · **사업자 상태 · 조회 과세유형 · 국세청 조회 문제** · 상태 조회 시각 · 폐업일 · 활성.
+"국세청 조회 문제" 는 30일 안의, **지금 번호로 조회한** 결과만 본다 — 폐업 · 사업자단위과세 전환(형식상 폐업 `utcc_yn=Y` — 영업은 계속하지만 그 번호는 더 쓰지 않으므로 번호 변경 필요로 표시) · 국세청 미등록 · 과세유형이 입력값과 다름. 머리말 위의 **사업자 상태 조회** 버튼은 화면의 행이 아니라 **필터 범위 전체**를 조회한다(신원 정보가 완전한 거래처의 폐업은 행으로 보이지 않기 때문).
 
 > ⚠ **거래처는 회사에 귀속되지 않는다.** Customer/Supplier 에 `company` 필드가 없다(실측: 두 JSON 전수. `represents_company` 는 "이 거래처가 대표하는 회사"로 뜻이 다르다). 회사를 지정하면 **그 회사의 `Party Account` 설정이 있거나 전표에 등장한** 거래처로만 좁히므로 **거래 이력이 없는 신규 거래처가 빠진다.** 발급 전에 마스터 결함을 잡는 것이 목적이므로 빠짐없이 보려면 회사를 비운다. 이 사실을 리포트 머리말로 화면에 고지한다.
 
@@ -468,7 +478,7 @@ CRN `1301110006246`→6. 구현이 만든 숫자가 아니라 독립 출처이�
 - **역할**: `ref_doctype` 이 `Customer` 하나뿐이므로 `execute()` 첫머리에서 `frappe.only_for(...)` 와 대상 DocType 별 `frappe.has_permission` 을 직접 확인한다. 같은 관례가 `nts_codes.report_unmapped` 에 이미 있다(§7.3).
 - **User Permission**: 거래처 조회를 `frappe.get_all` 이 아니라 **`frappe.get_list`** 로 한다. `get_all` 은 `ignore_permissions=True` 를 강제하고, 이 리포트의 거래처 컬럼이 `Dynamic Link` 라 frappe 의 사후 방어(`get_filtered_data` → `get_linked_doctypes`)도 못 막는다 — 그 함수는 `fieldtype == "Link"` 만 수집한다. `get_all` 을 쓰면 **담당 거래처가 제한된 사용자가 전 거래처의 상호·사업자등록번호를 본다.**
 
-사업자 상태 컬럼은 캐시 필드가 아니라 **로그에서 읽는다.** `party_identity.tax_status_bulk()` 가 `Korea Party Tax Status` 최신 행을 1회 조회로 가져온다. 캐시(`setive_tax_status`)를 직접 SELECT 하면 `stale_days` 규칙이 우회되어 **오래된 관측이 현재 상태처럼 표시된다.** 폐업일(`end_dt`)도 함께 컬럼으로 낸다 — 폐업자 수취분도 폐업일 **이전** 공급분은 정상 공제되므로 현재 상태만 보는 판정은 틀린다.
+사업자 상태 컬럼은 캐시 필드가 아니라 **로그에서 읽는다**(조회 연결은 §9.5). `party_identity.tax_status_bulk()` 가 `Korea Party Tax Status` 최신 행을 1회 조회로 가져온다. 캐시(`setive_tax_status`)를 직접 SELECT 하면 `stale_days` 규칙이 우회되어 **오래된 관측이 현재 상태처럼 표시된다.** 폐업일(`end_dt`)도 함께 컬럼으로 낸다 — 폐업자 수취분도 폐업일 **이전** 공급분은 정상 공제되므로 현재 상태만 보는 판정은 틀린다.
 
 이 리포트만 `disable_prepared_report_automation` 을 **0** 으로 둔다(기존 3종은 1). 거래처 전건 + `GL Entry` DISTINCT 를 훑어 앱에서 유일하게 15초를 넘길 수 있고, 위 선택 근거 3번이 그 자동 승격을 이점으로 들었기 때문이다. 끄면 근거와 설정이 반대가 된다.
 
@@ -607,9 +617,8 @@ $EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.company.backfill
 
 ### 9.3 신원 필드·리포트 검증 (2026-09-16 추가)
 
-> ⚠ **아래는 아직 실행되지 않았다.** 2026-09-16 기준 개발 스택에 컨테이너가 하나도 없고
-> (`docker compose -f $COMPOSE ps` → 0행), 사이트 DB 스키마의 17-dev 잔류(§10-1)도 미해소다.
-> 명령은 재현 가능하게 적어 두되 **"검증 통과"로 보고하지 않는다.**
+> **2026-09-17 실행 완료.** `make up-dev` → `bench migrate`(오류 0) 뒤 1~10 이 전부 기대값과 일치했다.
+> 실행 중 발견한 결함과 웹 UI 검증 결과는 §9.4 에 있다. 결함 수정 후 1~10 을 재실행해 다시 통과했다.
 
 ```bash
 COMPOSE=docker/development/docker-compose.yml
@@ -619,12 +628,12 @@ PY=/home/frappe/frappe-bench/env/bin/python
 
 # ── 사이트 없이 지금 돌아가는 유일한 검증 ──────────────────────────────
 # 체크섬 산식. frappe 비의존이라 호스트에서 그대로 실행된다. exit 0 이면 통과.
-cd ../setive_erpnext_kr && python3 scripts/identifiers/selftest.py; echo "exit=$?"
+cd ../setive-erpnext-kr && python3 scripts/identifiers/selftest.py; echo "exit=$?"
 # 2026-09-16 실행 결과: 손계산 벡터 · 구조 속성 10종 · 차분 145,001건(10자리 전부 0~9 발현) ·
 #   정규화/경계 (비-ASCII·구분코드 00 포함) · fixture 상수 5건 → 전부 통과, exit 0
 
 # ── 아래부터는 사이트가 필요하다 ──────────────────────────────────────
-# 0. 선행 — 스택 기동 + 스키마 정합. 사람 승인 사항이다(§10-1)
+# 0. 선행 — 스택 기동 + 스키마 정합 (2026-09-17 승인·실행, §10-1)
 make up-dev
 $EXEC bench --site $SITE migrate
 
@@ -669,13 +678,14 @@ $EXEC bench --site $SITE set-config setive_brn_validation_policy block
 $EXEC bench --site $SITE set-config setive_brn_validation_policy warn
 
 # 9. fixture — 신원 거래처 생성 · 개수 · 정규화 · block 정책 · 리포트 적중까지 한 번에
-docker compose -f $COMPOSE cp ../setive_erpnext_kr/scripts/nts/fixture_company.py backend:/tmp/fixture_company.py
+docker compose -f $COMPOSE cp ../setive-erpnext-kr/scripts/nts/fixture_company.py backend:/tmp/fixture_company.py
 for KEY in mfg trd; do
   docker compose -f $COMPOSE exec -T -w /home/frappe/frappe-bench/sites backend \
     $PY /tmp/fixture_company.py $SITE setup $KEY
 done
-# setup 안에서 assert_custom_field_counts · assert_normalized · assert_block_policy ·
-# assert_report 가 차례로 돈다. 실패하면 AssertionError 로 멈춘다.
+# setup 안에서 assert_custom_field_counts · assert_layout · assert_normalized ·
+# assert_block_policy · assert_input_hardening · assert_report 가 차례로 돈다.
+# 실패하면 AssertionError 로 멈춘다. assert_layout 이 §9.4 의 탭 배치를 브라우저 없이 확인한다.
 
 # 10. 정리 — 잔여 0 이어야 한다
 for KEY in mfg trd; do
@@ -688,11 +698,123 @@ done
 #    /app/query-report/Korea%20Etax%20Ineligible%20Parties
 ```
 
+### 9.4 런타임·웹 UI 검증 (2026-09-17)
+
+§9.3 을 실제 스택에서 처음 돌리고, Chrome 으로 Desk 화면을 조작해 확인했다. 결함은 전부
+수정한 뒤 migrate · fixture · 화면을 다시 확인했다.
+
+#### 통과한 것
+
+| 확인 | 결과 |
+|---|---|
+| migrate 후 Custom Field | 전역 44 · Account 7 · Company 13 · Customer 12 · Supplier 12 · `setive_nts_%` 8 |
+| `Korea Party Tax Status` 테이블 · 리포트 등재 | 존재 · Script Report 표준·활성 |
+| fixture `setup mfg` | 전표 20건 + 신원 거래처 6건, 모든 assert 통과 → teardown 잔여 0 |
+| 리포트 필터 (화면) | 회사 비움 6건 · 픽스처 회사 2건(⚠ 안내 표시) · 사업자등록번호 무효 1건 · 법인등록번호 오류 1건 · 공급업체+업태 2건 |
+| 저장 (화면) | 하이픈 입력 → 저장 후 숫자만 표시 · warn 은 주황 알림 후 저장 · block 은 「식별번호 오류」 모달로 거부 · block 이어도 `tax_id` 오류는 막지 않음 |
+| 폼 배치 (화면) | Customer·Supplier → 세금 탭 맨 위 독립 섹션 · Company → 세부 정보 탭 기본 정보 뒤 |
+
+#### 발견해 고친 결함
+
+| # | 결함 | 원인 | 조치 |
+|---|---|---|---|
+| 1 | Customer 신원 섹션이 **영업팀 탭**에 렌더되며 코어 필드 `account_manager` · `sales_team` 을 끌어들임. Supplier 는 **설정 탭**에 렌더 | frappe `Meta.sort_fields` 는 Section Break 커스텀 필드를 앵커에서 앞으로 걸려 보내며 **Section Break 또는 앵커와 같은 fieldtype** 에서만 멈춘다. Tab Break 에서 멈추지 않는다. 앵커를 "탭의 마지막 필드" 로 잡아 탭을 넘어갔다 | 앵커를 `tax_tab`(Tab Break 자체)으로 변경 — 다음 Tab Break 에서 반드시 멈춘다. `korea/common/form_layout.py` 신설, `after_migrate` 와 fixture `assert_layout` 이 탭·연속성·흡수를 검사 |
+| 2 | 리포트 첫 화면이 "Nothing to show" | 회사 필터 기본값이 사용자 기본 회사 → 거래 없는 신규 거래처가 빠짐 | 기본값 제거. 회사에 연결된 거래처가 0건일 때 머리말로 안내 |
+| 3 | 필드 설명문이 개발자 메모 그대로 노출(`**`, 문서 번호, 팝빌 API 필드명, 코어 fieldname, "XML 이 1..1 로 요구한다") | frappe 는 description 을 마크다운 처리 없이 HTML 로 넣는다 | 신원 필드·국세청 필드·조회 이력 DocType·리포트 머리말을 사용자 문장으로 교체, 근거는 코드 주석으로 이동. 앱 문구 163건 전수 검사 누출 0 |
+| 4 | 탭 이름 미번역·오번역 — `Tax`→"세", `Details`·`Settings`·`Sales Team`·`More Info`·`Connections` 영문, Company `Manufacturing`→"조작", `Stock Settings`→"기본 설정" | upstream ko 번역 공백·오역 | 앱 `locale/ko.po` 에 폼별 `msgctxt` 로 추가(탭·섹션 라벨은 DocType 을 컨텍스트로 번역되므로 해당 폼에만 적용). 컨텍스트 없이 불리는 `Details`·`Connections` 만 무맥락. 리포트·DocType 이름과 Select 표시값도 번역 |
+| 5 | 전각 숫자 사업자등록번호가 경고 없이 전각 그대로 저장되고 리포트에서도 빠짐 | 전각을 버리면 "숫자 0개 = 해외 식별자" 로 분류 | `identifiers.digits_only` 가 전각 숫자를 ASCII 로 변환 |
+| 6 | `BE0123456789` 처럼 본체가 10자리인 해외 VAT 의 국가 접두어가 저장 시 삭제됨 | 정규화가 자릿수만 봤다 | 숫자·구분자 외 문자(글자·위첨자 등)가 있으면 원본 보존(`_is_number_like`). 구분자는 **문자 범주**로 판정한다 — 공백류·유니코드 대시·서식 문자(제로폭 공백·BOM)·`. , / −`. 첫 수정은 고정 목록이라 엔대시·NBSP·탭·제로폭 공백이 붙은 정상 번호를 "해외 번호" 로 흘렸다(리뷰에서 발견·수정) |
+| 7 | 법인등록번호에 `없음`·`-` 같은 값이 block 정책에서도 경고 없이 저장 | 비숫자를 형식 오류로 옮기지 않았다 | `classify_crn` 이 비숫자도 형식 오류로 판정 |
+| 8 | REST 로 `setive_branch_code: 1`(숫자) 이 오면 500 | Data 필드에 숫자형이 그대로 들어온다 | validate 가 **숫자형만** 문자열로 맞춘다(`1248100998.0` → `1248100998`, JSON `false` → 빈 값). list·dict 는 frappe 의 자체 거부에 맡긴다 |
+| 9 | 읽기전용 "사업자 상태" 캐시를 REST·Data Import 로 임의 기록 가능 | `read_only` 는 폼만 막는다 | 저장 경로에서 이전 값으로 되돌림(`_protect_observed_cache`) |
+| 10 | 리포트가 법인등록번호·종사업장번호를 보지 않음 — block 전환 전에 저장 불능이 될 거래처를 찾을 곳이 없음 | 초판 범위 누락 | "법인등록번호·종사업장번호 오류" 필터·열 추가. 종사업장번호 판정을 `identifiers.check_branch_code` 로 옮겨 정규화와 같은 규칙을 쓴다(`0001호` 가 원본 그대로 저장되며 "정상" 으로 나오던 리뷰 발견 회귀) |
+| 11 | 문구: "사업자등록번호 **가**"(조사 띄어쓰기), 법인등록번호 오류에 "(체크섬·구분코드)", block 모달에 막지 않는 경고 누락, 결측 항목 열 머리글 정렬이 첫 행 값에 따라 바뀜, Prepared Report 로 승격되면 머리말이 사라짐, User Permission 안내가 제한 없는 사용자에게도 뜸, 조회 이력 목록에 `Supplier` 영문 | — | 각각 수정 (필드별 이유 라벨, 모달에 경고 병기, 열 `align` 고정, `.js` `after_refresh` 가 이번 요청 응답(`last_ajax`)의 머리말을 다시 그림, 거래처 목록을 실제로 좁히는 권한이 있을 때만 안내, `korea_party_tax_status_list.js` 가 DocType 컨텍스트로 번역) |
+| 12 | fixture 회귀 — `{pre} Supplier` 생성 줄이 커밋 `b3efe1b` 에서 삭제됨, 과세유형 라벨 문자열 고정, raw python 실행 시 언어가 en 이라 부서 트리 루트(`모든 부서`)를 못 찾음, 되돌리거나 지운 테스트 거래처가 `__global_search` 에 고아 행으로 남음 | 런타임 검증을 미룬 사이 누적 / 전역 검색 큐(Redis)는 DB 트랜잭션 밖 | 복원 · 정의에서 라벨 선택 · 사이트 언어 명시 · 테스트 블록에서 전역 검색 끄기 + teardown 이 고아 행 삭제 + residue 가 셈 |
+
+수정 뒤 반박 리뷰(20 에이전트)에서 위 6·8·10·11·12 의 **수정 자체의 결함** 7건이 추가로 나와 함께 고쳤다.
+selftest 는 두 변이(`digits_only` 를 `str.isdigit()` 로, 구분자 판정을 고정 목록으로 되돌리기)를 모두 실패로 잡는다.
+
+**확인하지 못한 것:** Prepared Report 모드에서 머리말이 화면에 다시 그려지는지. 서버 응답(0행)에 머리말이
+실려 있는 것까지는 확인했으나, 화면 확인 직전에 브라우저 확장 연결이 끊겼다. 확인 절차:
+`Report` 의 `prepared_report` 를 1 로 두고 → 회사 `세티브` 로 Generate New Report → 새로고침 →
+"⚠ 선택한 회사…" 줄이 보여야 한다 → `prepared_report` 를 0 으로, Prepared Report 문서는 삭제.
+
+#### frappe 16.31 필드 배치 규칙 — 앵커 고르는 법
+
+- 앵커가 **표준 필드**이고 삽입하는 필드가 Section/Column Break 이면, 삽입점이 **다음 Section Break 또는 앵커와 같은 fieldtype 의 필드 직전**까지 밀린다. Tab Break 는 멈춤 조건이 아니다(앵커 자신이 Tab Break 일 때만 멈춘다).
+- 앵커가 커스텀 필드이거나 삽입하는 필드가 break 가 아니면 걷지 않고 바로 뒤에 붙는다.
+- `field_order` Property Setter(Customize Form 저장 시 생성)가 우리 필드를 담고 있으면 `insert_after` 는 무시된다 — §11-18.
+- 서버 meta 순서가 곧 화면 순서다. 눈으로 판단하지 말고 `form_layout.section_problems` 로 확인한다.
+
+```bash
+# 배치 검사 — 기대: [] (문제 없음)
+$EXEC $PY -c "import frappe; frappe.init(site='$SITE'); frappe.connect(); \
+from setive_erpnext_kr.korea.common import party_identity as p, nts_codes as n; \
+print(p.layout_problems() + n.layout_problems())"
+# 번역 확인 — 기대: 세금 · 세부 정보 · 전자세금계산서 발급 불가 거래처
+$EXEC $PY -c "import frappe; frappe.init(site='$SITE'); frappe.connect(); \
+from frappe.translate import get_all_translations as g; t=g('ko'); \
+print(t.get('Tax:Customer'), t.get('Details'), t.get('Korea Etax Ineligible Parties'))"
+```
+
+#### 범위 밖으로 남긴 것
+
+- 세 폼의 **필드 라벨** 미번역 85개(Customer 20 · Supplier 27 · Company 38 — `Alias`, `Payment Terms Template`, `Tax Withholding Group` 등)와 표 행 번호 머리글 `No.` → "아니요." 오역. 이번에는 탭·섹션 라벨까지만 고쳤다(§11-21).
+- 콘솔의 `socket.io … http://localhost:undefined/…` 오류는 개발 compose 의 실시간 포트 설정 문제이며 이 작업과 무관하다.
+- fixture 를 raw python 으로 돌릴 때 부서 트리 오류가 나던 것은 fixture 쪽(언어 명시)에서만 막았다. 코어 동작은 바꾸지 않았다.
+
+### 9.5 국세청 조회 연결 · 해외 거래처 · 오번역 (2026-09-17)
+
+사용자 결정(2026-09-17): **서비스키는 SETIVE 가 보관하고 배포 때 적용한다**, **조회 결과로 저장을 막지 않는다**,
+해외 거래처에 대비한다, 자릿수가 틀린 한국 번호를 표시한다, 오번역을 고친다.
+
+| 구성 | 파일 | 내용 |
+|---|---|---|
+| 접속 정보 | `korea/common/nts_access.py` | 사이트 설정에서만 읽는다. 게이트웨이(목표)·직접(임시)·끔. 실패 뒤 일시 정지. 구조·주입 규칙은 [KB-OPS-002](./KB-OPS-002_tenant_integration_credentials.md) §15 |
+| 전송 | `korea/common/nts_bizinfo.py` | `DirectEndpoint`(키 = URL 쿼리) · `GatewayEndpoint`(토큰 = 헤더). 오류 문자열의 키 가리기, 429 분류 |
+| 조회·기록 | `korea/common/party_tax_status.py` | 번호 추리기 → 100건씩 조회 → 이력 1행 + 거래처 표시 칸 갱신(`update_modified=False`). 30분 안 재조회 생략. 번호 없음·해외·무효는 건너뜀 |
+| 화면 | `public/js/party_tax_status.js` 외 2 · `hooks.doctype_js` | 고객·공급업체 폼 **국세청 사업자 상태 조회** 버튼 → 결과 모달(조회 시각·안내 병기) |
+| 연결 문서 탭 | `hooks.override_doctype_dashboards` | "한국 세무 → 거래처 사업자 상태 조회 이력" |
+| 이력 필드 추가 | `Korea Party Tax Status` | 과세유형 코드 · 형식상 폐업(사업자단위과세 전환) · 세금계산서 적용일 · 직전 과세유형 코드 |
+| 리포트 | 위 §7.5 | 국내 거래처만 · 자릿수 의심 · 국세청 조회 문제 · 범위 전체 조회 버튼 |
+
+**실조회 결과(로컬, 직접 방식):** `nts_access.verify()` 성공. 픽스처 거래처 고객 3 · 공급업체 2 조회 → 이력 5행, 표시 칸 갱신, 30분 안 재조회 생략 확인. 원본 응답에는 사업자번호와 상태값 11필드만 있다.
+픽스처 번호 중 `119-81-00870`(1995-12-31 폐업) · `106-81-28800`(1993-12-31 폐업)은 **실존 법인**이었다 — 체크섬만 맞춘 번호가 겹쳤다. 픽스처는 국세청을 부르지 않는다(가짜 전송).
+
+**화면 확인(Chrome):** 폼 버튼 → 결과 모달(폐업자·폐업일·조회 시각, 빨간 표시) → 세금 탭 표시 칸 "폐업자" · 폼 수정 상태 아님 → 연결 문서 탭 이력 1건. 리포트 버튼 → "고객 6곳 중 조회 2 · 건너뜀 4", "공급업체 3곳 중 조회 2 · 건너뜀 1" → 새로고침 뒤 신원 정보가 완전한 공급업체가 "폐업(1993-12-31)" 으로 나타남.
+
+**픽스처 검증(네트워크 없음) `assert_nts_lookup`:** 계속·형식상 폐업·미등록 응답 기록 / 리포트가 형식상 폐업을 '번호 변경 필요' 로, 미등록·과세유형 불일치를 문제로 봄 / 번호를 고치면 옛 결과를 쓰지 않음 / 30분 규칙 / 인증 실패 → 10분 정지 → 다음 호출은 네트워크를 타지 않음 / 설정 없음 → 호출 안 함.
+
+**반박 리뷰(33 에이전트) 뒤 고친 것** — 확정 25건:
+- **비밀값 노출 차단**: 오류 응답 본문을 읽다 끊기면 예외가 밖으로 새어 frappe 가 지역 변수(`url` = 서비스키, `headers` = 토큰)를 Error Log 에 평문으로 남길 수 있었다 → 전송 계층이 어떤 경우에도 예외를 던지지 않게 했다. 리다이렉트를 따라가며 토큰을 http·다른 호스트로 다시 보내던 urllib 기본 동작을 끊었다(3xx 는 오류).
+- **결과를 지금 번호에 묶음**: 번호를 고친 뒤에도 옛 번호의 '폐업' 이 표시·리포트·30분 규칙에 남던 것을 막았다.
+- **실패 처리**: 100건씩 하나씩 불러 첫 묶음이 인증 실패면 나머지를 보내지 않는다. 인증 실패 기록은 요청이 롤백돼도 남는다(`defer_insert`). 일괄 조회는 예외 대신 결과로 문제를 돌려줘 앞 유형의 기록이 롤백되지 않는다. 같은 작업이 진행 중이면 "진행 중" 으로 알린다. 게이트웨이의 502/503/504(HTML·빈 본문)도 서버 오류로 분류해 호출을 멈춘다.
+- **조회 이력 권한**: 거래처 칸이 Dynamic Link 라 User Permission 이 적용되지 않았다 → `permission_query_conditions` · `has_permission` 으로 담당 거래처의 이력만 보이게 했다(제한 사용자 검증).
+- **사업자단위과세 전환**: 형식상 폐업이라도 **그 번호는 더 쓰지 않으므로** 리포트에 "본점 사업자등록번호·종사업장번호로 변경 필요" 로 표시한다(구매 쪽 폐업 경고와는 다른 질문 — 세무 검토 대상).
+- 한국 거래처의 `없음`·`-` 같은 번호도 "확인 필요" 로 표시, 사용 중지된 주소는 국가 판단에서 제외, 조회 대상만 세어 상한 적용(백그라운드 500건씩 커밋), 조회 버튼 호출 제한, 머리말에 국세청 기준 추가.
+
+**오번역 52건 수정** — erpnext/frappe `ko.po` 의 뜻이 틀린 번역을 앱 `ko.po` 에서 같은 (msgid, msgctxt) 로 덮었다([KB-LOC-003](./KB-LOC-003_fork_local_translation.md) §2·§9). 모든 사용처가 같은 뜻인 것만 무맥락으로 덮었다. 예: `Item` 목→품목, `Credit Note` 신용장→대변표, `Journal Entry` 일지 항목→분개 전표, `Stock Entry` 주식 입력→재고 전표, `Taxes` 구실→세금, `BOM` 봄→BOM, `Is Frozen` 냉동실에 있습니다→거래 동결, `Quotation` 인용→견적서, `Lead` 선두→리드, 표 행 번호 `No.` 아니요.→번호.
+뜻이 갈리는 `Release Date` 는 공급업체·매입송장 폼 컨텍스트로만, `Accounts` 는 덮지 않았다(다른 곳에서는 "계정" 이 맞다).
+**`Sales`(매상) · `Credit Note`(신용장)는 되돌렸다.** erpnext 가 번역문을 **레코드 이름**으로 쓴다 — 설치 때 영업 기회 유형·인쇄 제목을 번역된 이름으로 만들고 실행 중에도 같은 번역으로 찾는다(`opportunity.py` `set_opportunity_type`, `sales_and_purchase_return.py`). 번역만 바꾸면 한국어로 설치한 사이트에서 영업 기회 생성이 막힌다. 레코드 이름 변경 패치와 함께 해야 한다(§11-23).
+⚠ 이 로컬 사이트는 영어로 설치되어 레코드 이름이 `Sales` 다. 그래서 **한국어 사용자가 영업 기회를 만들면 원래부터** `_("Sales")` = "매상" 을 찾지 못한다 — upstream 결함이며 이번 변경과 무관하다(§11-23).
+⚠ 이미 만들어진 데이터는 바뀌지 않는다 — 회사 생성 때 번역으로 저장된 부서 이름(`매상 - …` · `보내다 - …` · `계정 - …`)은 레코드 이름 변경이 따로 필요하다.
+
+```bash
+# 접속 방식 (비밀값 없음) · 실제 1건 조회
+$EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_access.describe
+$EXEC bench --site $SITE execute setive_erpnext_kr.korea.common.nts_access.verify
+# 번역 — 기대: 품목 · 대변표 · 번호 · 보류 해제일 · 출시일
+$EXEC $PY -c "import frappe; frappe.init(site='$SITE'); frappe.connect(); \
+from frappe.translate import get_all_translations as g; t=g('ko'); \
+print(t.get('Item'), t.get('Credit Note'), t.get(\"No.:Title of the 'row number' column\"), t.get('Release Date:Supplier'), t.get('Release Date'))"
+```
+
 ## 10. 알려진 한계·후속 과제
 
 1. ~~**환경 불일치 — 포크와 이미지 frappe 버전.**~~ **해소됨 (2026-09-06 리베이스).** 포크를 `develop`(17.0.0-dev) 에서 태그 `v16.33.0` 위로 리베이스해 `Meta.get_translated_label` 호출이 0건이 됐다. 재실측: `erpnext 16.33.0 / frappe 16.31.0`, `hasattr(Meta,'get_translated_label')` → `False`, 구 크래시 지점 `buying_controller.validate_from_warehouse` 직접 호출 시 `AttributeError` 가 아니라 정상 `ValidationError`. E2E 의 shim 은 더 이상 필요 없다. 사고 경위·재발 방지는 [KB-OPS-001 §1.7](./KB-OPS-001_tenant_provisioning_deployment.md) 로 옮겼다.
    **다만 리베이스 직후 사이트에 `bench migrate` 를 돌리지 않아 DB 스키마가 17-dev 에 머물러 있다** — `Contact.is_billing_contact` 부재(1054)로 매입·매출 전표가 전부 막히고, 고아 DocType `Company Restriction` 과 `Supplier`/`Customer`/`Item` 의 `allowed_companies` 필드가 남아 `ImportError` 를 낸다. 사람 승인 시점에 `bench --site $SITE migrate` 를 실행한 뒤 §9.1 을 우회 없이 재실행해야 한다. 결손 목록과 복구 근거는 KB-OPS-001 §1.7.
    **새 미해결 항목이 하나 생겼다:** `company_defaults.DEFAULTS` 의 세 필드가 16.33 Company 에 없다 (§4.1 경고).
+   **2026-09-17 — 스키마 잔류 서술은 사실이 아니었다(§12).** migrate 전에 실측하니 `tabContact.is_billing_contact` 가 **이미 있었고**, `Company Restriction` DocType 과 `allowed_companies` 필드는 세 DocType 모두 **없었다.** 같은 날 migrate 를 실행했고(오류 0) fixture 전표 20건이 모두 제출됐다.
 2. **Transit 창고 타입.** 위저드 밖에서 만든 회사는 `Warehouse Type "Transit"` 이 없어 코어 창고 생성이 실패할 수 있다. 앱 fixtures 또는 `after_migrate` 로 보장할지 결정 필요.
 3. **v16 신규 Company 필드는 비워 두었다** (과제 범위 20개 밖). `purchase_expense_account` / `purchase_expense_contra_account`, `expenses_added_to_stock_account` / `…_contra_account` 는 `Accounts Settings.book_stock_expense_gl_entries` 를 켜면 재고 품목 매입에서 throw 한다(`buying_controller.py:325-344`). `service_expense_account`(외주가공, 5248 후보), `unrealized_profit_loss_account`(내부거래)도 후속 결정.
 4. **Tax Rule 미생성** (§6.4).
@@ -722,10 +844,27 @@ done
 | 13 | 기본 입고 창고 (§5) | 없음 — 16.33 에 `Company.default_warehouse` 필드가 없다 | `Stock Settings.default_warehouse` 전역 지정 / Item Default 경로 / 지정하지 않음 |
 | 14 | `company_defaults.DEFAULTS` 의 16.33 부재 필드 3개 (§4.1) | 그대로 씀 — 신규 16.33 사이트에서 1054 로 회사 생성 실패 | 세 항목 제거 + `meta.has_field` 필터로 `skipped` 처리 |
 | 15 | ~~창고→계정 매핑의 업종 분기 (§5)~~ | **결정·구현됨 (2026-09-08)** — Company `setive_industry_profile` 로 분기(§4.4·§5). 겸업 테넌트용 코어 `enable_item_wise_inventory_account` 검토는 KB-KOR-004 §8-6 | — |
+| 16 | 업태·종목을 "발급 불가" 기준에 넣을지 (§9.4-3) | **유지로 결정(2026-09-17)** — 비면 리포트에 표시. 연동사 발급 API 문서로 확정 예정 | XML 이 1..1 로 요구한다는 근거가 확인된 것은 상호·대표자성명뿐이다(ONT-ENT-002 §2.5). 연동사 발급 API 가 요구하는지 확인 후 유지하거나 "권장" 으로 내린다 |
+| 17 | ~~해외 거래처를 리포트에서 뺄지~~ | **구현(2026-09-17)** — "국내 거래처만" 필터, 기본 켜짐(§7.5) | — |
+| 18 | Customize Form 을 저장한 사이트의 섹션 위치 | `after_migrate` 가 배치 이상을 Error Log 로만 남긴다 | 테넌트의 `field_order` Property Setter 에서 우리 필드만 빼는 패치를 자동 적용 (테넌트 설정을 앱이 고친다) |
+| 19 | 리포트 역할 | 역할표: Accounts User · Accounts Manager · Auditor / 코드 `only_for` 에는 System Manager 도 있음. Auditor 는 Customer 보고서 권한이 없어 실제로는 못 연다 | 두 목록을 맞추고, Auditor·마스터 관리자 역할을 넣을지(권한 추가 필요) 결정 |
+| 20 | ~~한국 번호 형식인데 자릿수가 틀린 `tax_id`~~ | **구현(2026-09-17)** — 리포트에 "자릿수가 틀린 한국 번호로 보임"(한국 거래처이거나 `123-45-…` 모양). 저장 시에는 경고하지 않는다 | — |
+| 21 | 코어 번역 공백 — 세 폼 필드 라벨 85개(미번역) | **오역 54건은 수정(2026-09-17, §9.5)**. 미번역 필드 라벨은 그대로 | 필드 라벨까지 앱 `ko.po` 로 보강 |
+| 23 | 번역문을 레코드 이름으로 쓰는 upstream 항목(`Sales`·`Credit Note`) | 오역 그대로 둠. 영어로 설치한 사이트에서는 한국어 사용자의 영업 기회 기본 유형 조회가 원래 실패한다 | 레코드 이름 변경 패치(`매상`→`판매`, `신용장`→`대변표`)와 번역 수정을 함께 / 영업 기회를 쓰는 테넌트가 생길 때 처리 |
+| 22 | 앱 문구의 번역 키 언어 | 한국어 msgid — **당분간 유지로 결정(2026-09-17)** | 다국어 사용자가 생기면 앱 전체를 영문 msgid + ko.po 로 전환 |
 
 ---
 
 ## 12. 이전 서술 정정
+
+### 2026-09-17 — 런타임·웹 UI 검증에 따른 정정
+
+- **§10-1 "사이트 DB 스키마가 17-dev 에 머물러 있다" 는 사실이 아니었습니다.** migrate 전에 실측하니 `Contact.is_billing_contact` 가 있었고 `Company Restriction`·`allowed_companies` 는 없었습니다. 이 서술 때문에 §9.3 을 "실행 불가" 로 미뤄 왔는데, 미룬 사이 fixture 회귀 3건(§9.4-12)과 화면 결함이 쌓였습니다.
+- **§7.4 · 소스 주석의 Customer/Supplier 섹션 앵커 서술("Tax 탭의 마지막 필드 뒤에 붙여야 레이아웃이 잘리지 않는다")은 틀렸습니다.** frappe 는 Section Break 를 앵커 바로 뒤에 두지 않고 다음 Section Break 직전까지 밀어내며, Tab Break 에서 멈추지 않습니다. 실제로는 다른 탭에 렌더됐습니다(§9.4-1). 앵커를 `tax_tab` 으로 바꿨습니다.
+- **Company 섹션 닫개(`setive_kr_tax_section_end`) 주석 — "안 닫으면 `parent_company`·`reporting_currency` 가 섹션에 들어온다" 는 틀렸습니다.** 같은 규칙으로 섹션이 이미 그 두 필드 뒤에 놓이므로 오늘은 닫개가 빈 섹션으로 숨습니다. upstream 이 Date 필드를 추가하는 경우를 막는 방어로 남겼고 주석을 고쳤습니다.
+- **리포트 docstring·머리말의 "전자세금계산서 XML 이 1..1 로 요구하는 상호·대표자성명·업태·종목" 은 근거와 다릅니다.** 저장소의 근거(ONT-ENT-002 §2.5)가 1..1 로 적은 것은 상호·대표자성명뿐입니다. 판정 동작은 그대로 두고 문구만 고쳤으며, 기준 자체는 §11-16 결정 대기입니다.
+- **`assert_block_policy` docstring 의 "identifiers.py 가 없어 체크섬 판정이 전부 unverified" 는 M1 완료(2026-09-16)로 낡은 서술이었습니다.** 고쳤습니다.
+- **리포트 필터 값이 바뀌었습니다.** "사업자등록번호 결측" → "사업자등록번호 미입력", "사업자등록번호 체크섬 오류" → "사업자등록번호 무효"(구분코드 오류도 포함하므로), 필터 라벨 "결측 항목" → "문제 항목". 옛 값을 담은 URL 은 필터가 맞지 않습니다.
 
 ### 2026-09-16 (3) — M1 완료에 따른 정정
 
@@ -743,7 +882,7 @@ done
 
 ### 2026-09-16 (2) — 신원 필드 추가에 따른 정정
 
-- **"Company Custom Field 는 이 한 곳에서 관리한다" 는 더 이상 사실이 아닙니다.** §7.1 과 [`korea/common/nts_codes.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/nts_codes.py):129 주석이 그렇게 적었는데, 2026-09-16 에 신원 필드가 `party_identity.py` 로 들어오면서 **Company Custom Field 의 소유자가 둘**이 됐습니다(회계·업종 → `nts_codes`, 세무 신원 → `party_identity`). 그대로 두면 다음 사람이 `nts_codes.get_custom_fields()` 만 보고 "Company 필드는 2개"라고 판단합니다. 소스 주석을 고쳤고 `install.py` 의 `_ensure_custom_fields` 가 **둘 다** 부릅니다 — 한쪽만 부르면 무증상으로 필드가 빠집니다.
+- **"Company Custom Field 는 이 한 곳에서 관리한다" 는 더 이상 사실이 아닙니다.** §7.1 과 [`korea/common/nts_codes.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/nts_codes.py):129 주석이 그렇게 적었는데, 2026-09-16 에 신원 필드가 `party_identity.py` 로 들어오면서 **Company Custom Field 의 소유자가 둘**이 됐습니다(회계·업종 → `nts_codes`, 세무 신원 → `party_identity`). 그대로 두면 다음 사람이 `nts_codes.get_custom_fields()` 만 보고 "Company 필드는 2개"라고 판단합니다. 소스 주석을 고쳤고 `install.py` 의 `_ensure_custom_fields` 가 **둘 다** 부릅니다 — 한쪽만 부르면 무증상으로 필드가 빠집니다.
 - **"Custom Field 9개" 는 이제 앱 전체 총계가 아닙니다.** 9 는 `nts_codes` 소유분(Account 7 + Company 2)이고 전체는 **44**(§7.4)입니다. §8 백필 절차의 점검 명령이 `fieldname like 'setive\_nts\_%'` 로 **8** 을 기대하는 것은 그대로 맞지만, 그 명령만으로는 신원 필드를 **전혀 세지 못합니다** — M2 이후에도 8 로 고정입니다. §9.3 에 DocType 별 분해 명령을 추가했습니다.
 
 ### 2026-09-16

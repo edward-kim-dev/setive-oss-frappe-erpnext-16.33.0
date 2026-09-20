@@ -22,7 +22,7 @@ related: [KB-KOR-002, KB-KOR-003, KB-KOR-001, KB-OPS-001, KB-ARCH-002, ONT-ENT-0
 |---|---|
 | 엔진 | `setive_erpnext_kr/korea/common/nts_report.py` |
 | 서식 행 정의 | `setive_erpnext_kr/korea/common/data/nts_form_rows.json` (bs 287 · is 199 · mfg 45행) |
-| 리포트 3종 | `setive_erpnext_kr/setive_erpnext_kr/report/nts_standard_{balance_sheet,income_statement}/`, `.../nts_manufacturing_cost_statement/` |
+| 리포트 3종 | `setive-erpnext-kr/setive_erpnext_kr/report/nts_standard_{balance_sheet,income_statement}/`, `.../nts_manufacturing_cost_statement/` |
 | 검증 fixture | `scripts/nts/fixture_company.py` — 제조·상품매매 회사를 만들고 지운다 (§7) |
 
 포크는 수정하지 않았습니다.
@@ -137,7 +137,7 @@ ERPNext 는 **영구재고**라 판매 시점에 실제 매출원가를 원장(`
 전환 절차:
 
 ```bash
-# 형제 앱 저장소(setive_erpnext_kr) 루트에서 실행한다. 포크 경로는 ../setive-oss-erpnext-16.33 이다.
+# 형제 앱 저장소(setive-erpnext-kr) 루트에서 실행한다. 포크 경로는 ../setive-oss-erpnext-16.33 이다.
 CHART=../setive-oss-erpnext-16.33/erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json
 
 # 1. 생성기를 고친다 (JSON 은 생성물이라 손으로 고치면 다음 재생성에서 사라진다)
@@ -301,7 +301,7 @@ bench --site <site> execute setive_erpnext_kr.korea.common.nts_report.reconcile 
 ```bash
 COMPOSE=docker/development/docker-compose.yml
 SITE=localhost
-APP=../setive_erpnext_kr
+APP=../setive-erpnext-kr
 PY=/home/frappe/frappe-bench/env/bin/python
 EXEC="docker compose -f $COMPOSE exec -T backend"
 

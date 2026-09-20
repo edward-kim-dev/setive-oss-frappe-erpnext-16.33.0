@@ -41,7 +41,7 @@ AI 에이전트가 ERPNext API로 만든 산출물을 어떻게 회수하고 배
 <테넌트 체크아웃 루트>/
 ├── setive-oss-erpnext-16.33/     ← 앱 1: ERPNext 포크 (저장소 A)
 │   └── docker/development/docker-compose.yml
-└── setive_erpnext_kr/            ← 앱 2: 한국화 앱 (저장소 B)
+└── setive-erpnext-kr/            ← 앱 2: 한국화 앱 (저장소 B)
 ```
 
 두 폴더는 **형제 관계**여야 합니다. compose의 마운트 경로가 상대경로로 형제 폴더를 가리키기 때문입니다.
@@ -69,7 +69,7 @@ Frappe 관점에서 이 셋은 **동등한 앱**입니다. `erpnext`가 특별 �
 
 ```yaml
 - ../../:/home/frappe/frappe-bench/apps/erpnext
-- ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+- ../../../setive-erpnext-kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
 ```
 
 `../../`는 저장소 A의 루트, `../../../`는 그 부모(= 두 저장소의 공통 부모)를 가리킵니다.
@@ -433,7 +433,8 @@ bench --site "$SITE" export-doc "DocType" "<DocType 이름>"
 
 ```bash
 COMPOSE=docker/development/docker-compose.yml
-APP=setive_erpnext_kr
+APP=setive_erpnext_kr        # frappe 앱 이름(밑줄) — 컨테이너 apps/ 아래 이름
+DIR=../setive-erpnext-kr     # 호스트 형제 폴더 이름(하이픈) — 둘은 다르다
 SITE=localhost
 
 # 1. 앱 생성 (저작 환경에서 1회). 프롬프트: Title / Description / Publisher / Email
@@ -442,7 +443,7 @@ docker compose -f "$COMPOSE" exec -T backend bench new-app "$APP" --no-git
 
 # 2. 호스트 형제 폴더로 복사 (컨테이너 apps/ 는 볼륨이 아니므로 재생성 시 소실)
 CID=$(docker compose -f "$COMPOSE" ps -q backend)
-docker cp "$CID:/home/frappe/frappe-bench/apps/$APP" ../$APP
+docker cp "$CID:/home/frappe/frappe-bench/apps/$APP" "$DIR"
 
 # 3. compose 마운트 3곳 추가 (§1.2) 후 스택 재기동 → apps.txt 자동 갱신 (§1.3)
 docker compose -f "$COMPOSE" up -d

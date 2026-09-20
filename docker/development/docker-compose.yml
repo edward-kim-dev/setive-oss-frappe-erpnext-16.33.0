@@ -22,7 +22,7 @@ x-backend-defaults: &backend_defaults
     # 바이너리만 볼륨으로 분리해 configurator 가 컴파일한 결과를 전 컨테이너가 공유한다.
     - locale-data:/home/frappe/frappe-bench/assets/locale
     - ../../:/home/frappe/frappe-bench/apps/erpnext
-    - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+    - ../../../setive-erpnext-kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
     # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
     # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
     # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.
@@ -88,7 +88,7 @@ services:
       - sites-data:/home/frappe/frappe-bench/sites
       - locale-data:/home/frappe/frappe-bench/assets/locale
       - ../../:/home/frappe/frappe-bench/apps/erpnext
-      - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+      - ../../../setive-erpnext-kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
       # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
       # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
       # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.
@@ -186,7 +186,7 @@ services:
     volumes:
       - sites-data:/home/frappe/frappe-bench/sites
       - ../../:/home/frappe/frappe-bench/apps/erpnext
-      - ../../../setive_erpnext_kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
+      - ../../../setive-erpnext-kr:/home/frappe/frappe-bench/apps/setive_erpnext_kr
       # 포크를 apps/erpnext 에 바인드 마운트하면 이미지에 구워진 dist(1.8M)가
       # 가려져 /assets/erpnext/dist/** 가 전부 404 가 된다. 이 이미지에는 node 가
       # 없어 bench build 로 재생성할 수도 없으므로 dist 만 볼륨으로 되살린다.

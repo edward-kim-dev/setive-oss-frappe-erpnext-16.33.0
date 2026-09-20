@@ -96,7 +96,7 @@ related: [ONT-CLS-001, KB-LOC-003]
 `docs/kb/KB-XXX-001_....md` 에서 저장소 루트의 소스를 가리키는 경우:
 
 ```markdown
-[`erpnext/public/js/setup_wizard.js`](../../erpnext/public/js/setup_wizard.js)      ✅
+[`erpnext/public/js/setup_wizard.js`](../erpnext/public/js/setup_wizard.js)      ✅
 [`erpnext/public/js/setup_wizard.js`](file:///Users/edward/.../setup_wizard.js)     ❌
 ```
 

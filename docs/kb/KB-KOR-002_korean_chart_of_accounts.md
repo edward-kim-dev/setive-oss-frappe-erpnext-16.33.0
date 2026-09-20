@@ -18,8 +18,8 @@ related: [KB-KOR-003, KB-OPS-001, KB-KOR-001, ONT-CLS-001]
 | 산출물 | 위치 | 규모 |
 |---|---|---|
 | 계정과목표 (ERPNext verified 차트) | [`erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json`](../../erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json) | 324 계정 = 그룹 52 + 원장 272, 4자리 번호 |
-| 국세청 표준재무제표 코드 매핑 | `setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json` (형제 앱 저장소) | 원장 272 전부 배정: 재무상태표 137 · 손익계산서 92 · 제조원가명세서 35 · 대사전용 7 · 대상아님 1, 산식 행 34, 미검증 33 |
-| 생성·검증 스크립트 | `setive_erpnext_kr/scripts/coa/` (`tree_draft.json` → `build_kr_coa.py` → 차트, `build_nts_map.py` → 매핑, `validate_coa.py`, 서식 원본 추출 `nts_codes.json`) | 재실행하면 같은 파일이 나온다 (md5 일치 확인) |
+| 국세청 표준재무제표 코드 매핑 | `setive-erpnext-kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json` (형제 앱 저장소) | 원장 272 전부 배정: 재무상태표 137 · 손익계산서 92 · 제조원가명세서 35 · 대사전용 7 · 대상아님 1, 산식 행 34, 미검증 33 |
+| 생성·검증 스크립트 | `setive-erpnext-kr/scripts/coa/` (`tree_draft.json` → `build_kr_coa.py` → 차트, `build_nts_map.py` → 매핑, `validate_coa.py`, 서식 원본 추출 `nts_codes.json`) | 재실행하면 같은 파일이 나온다 (md5 일치 확인) |
 
 위저드 드롭다운 표시명은 **"한국 표준 계정과목표 (일반기업회계기준)"** 이며 `Company.chart_of_accounts` 에 이 문자열이 저장된다.
 
@@ -209,14 +209,14 @@ accounts          계정번호 → {bs|is|mfg, label, sign?, contra?, level?, ro
 
 ```bash
 # 정적 검사 — 기대: "-- errors 0, warnings 0"
-python3 ../setive_erpnext_kr/scripts/coa/validate_coa.py \
+python3 ../setive-erpnext-kr/scripts/coa/validate_coa.py \
   erpnext/accounts/doctype/account/chart_of_accounts/verified/kr_standard_chart_of_accounts.json \
-  --map ../setive_erpnext_kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json \
-  --nts ../setive_erpnext_kr/scripts/coa/nts_codes.json
+  --map ../setive-erpnext-kr/setive_erpnext_kr/korea/common/data/nts_standard_code_map.json \
+  --nts ../setive-erpnext-kr/scripts/coa/nts_codes.json
 
 # 재생성 — 결과가 현재 파일과 같아야 한다 (md5 비교)
-python3 ../setive_erpnext_kr/scripts/coa/build_kr_coa.py     # → verified/kr_standard_chart_of_accounts.json
-python3 ../setive_erpnext_kr/scripts/coa/build_nts_map.py    # → korea/common/data/nts_standard_code_map.json
+python3 ../setive-erpnext-kr/scripts/coa/build_kr_coa.py     # → verified/kr_standard_chart_of_accounts.json
+python3 ../setive-erpnext-kr/scripts/coa/build_nts_map.py    # → korea/common/data/nts_standard_code_map.json
 
 # 컨테이너: 드롭다운 목록 노출 — 기대: ["한국 표준 계정과목표 (일반기업회계기준)", "Standard", "Standard with Numbers"]
 COMPOSE=docker/development/docker-compose.yml

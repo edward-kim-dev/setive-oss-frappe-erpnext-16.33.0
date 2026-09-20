@@ -38,7 +38,7 @@ korea/common/etax/          ← 벤더 무관 계약층. 여기에 벤더 이름
 | 축 | 결정 | 절 |
 |---|---|---|
 | 모듈 경로 | `korea/common/etax/` 1개. `einvoice/` 폐기 | §2 |
-| DocType | 4벌 + 인접 1벌. 물리경로 `setive_erpnext_kr/setive_erpnext_kr/doctype/<slug>/` | §3 |
+| DocType | 4벌 + 인접 1벌. 물리경로 `setive-erpnext-kr/setive_erpnext_kr/doctype/<slug>/` | §3 |
 | 포트 | `etax/contract.py` 의 `Protocol`. 본체 8연산 + Capability 2개 | §4 |
 | 상태 | `DocumentState` × `NtsState` 2축. `NOT_OBSERVABLE` 포함 | §5 |
 | 관리번호 | `document_key`(문서 주소) + `attempt_token`(요청 식별) 분리 | §6 |
@@ -76,8 +76,8 @@ korea/common/etax/          ← 벤더 무관 계약층. 여기에 벤더 이름
 | 종류 | 경로 | 근거 |
 |---|---|---|
 | 로직 | `setive_erpnext_kr/korea/common/etax/` | CLAUDE.md 2단계 |
-| DocType JSON | `setive_erpnext_kr/setive_erpnext_kr/doctype/<slug>/` | 모듈 폴더 강제. `modules.txt` 가 `SETIVE ERPNext KR` 하나뿐이므로 `frappe.scrub` → `setive_erpnext_kr` |
-| Report | `setive_erpnext_kr/setive_erpnext_kr/report/<slug>/` | 위와 동일. 실재 선례 3종 |
+| DocType JSON | `setive-erpnext-kr/setive_erpnext_kr/doctype/<slug>/` | 모듈 폴더 강제. `modules.txt` 가 `SETIVE ERPNext KR` 하나뿐이므로 `frappe.scrub` → `setive_erpnext_kr` |
+| Report | `setive-erpnext-kr/setive_erpnext_kr/report/<slug>/` | 위와 동일. 실재 선례 3종 |
 
 > ⚠ `erpnext/regional/korea/` 는 만들지 않는다. `frappe.scrub("Korea, Republic of")` 가 쉼표 때문에 import 불가능한 이름을 만들고 **프레임워크가 그 예외를 조용히 삼킨다**([`CLAUDE.md`](../../CLAUDE.md) 금지 사항). 단 `regional_overrides` 훅 자체는 국가명 **문자열 키** 조회라 한국에서 동작한다([KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md) §7.1) — 디렉터리 금지와 훅 사용 가부는 별개다.
 
@@ -96,13 +96,13 @@ korea/common/etax/          ← 벤더 무관 계약층. 여기에 벤더 이름
 
 | DocType | slug | 성격 |
 |---|---|---|
-| `Korea Party Tax Status` | `korea_party_tax_status` | 거래처 사업자 상태 관측 **append-only 로그**. [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) M2/M4 |
+| `Korea Party Tax Status` | `korea_party_tax_status` | 거래처 사업자 상태 관측 **append-only 로그**. [KB-KOR-005](./KB-KOR-005_localization_roadmap.md) M2/M4. 국세청 `BusinessStatus` 11필드를 **파생 판정 전 원본 그대로** `raw_response` 에 저장하고, 판정에 쓰는 값(상태·과세유형 코드·형식상 폐업·폐업일·세금계산서 적용일)은 필드로 따로 둔다(2026-09-17, KB-KOR-003 §9.5) |
 
-모든 JSON 의 `"module"` 은 반드시 `SETIVE ERPNext KR` 이다 — `modules.txt` 의 실제 값이며 다르면 `reload_doc` 이 경로를 만들지 못한다([`korea/common/nts_codes.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/nts_codes.py):26-27). 각 폴더에 빈 `__init__.py` 가 필요하다(Report 3종 전부 갖고 있다).
+모든 JSON 의 `"module"` 은 반드시 `SETIVE ERPNext KR` 이다 — `modules.txt` 의 실제 값이며 다르면 `reload_doc` 이 경로를 만들지 못한다([`korea/common/nts_codes.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/nts_codes.py):26-27). 각 폴더에 빈 `__init__.py` 가 필요하다(Report 3종 전부 갖고 있다).
 
 ### 3.1 DocType 등재 경로가 없다 — `_ensure_doctypes()` 를 만든다
 
-[`install.py`](../../../setive_erpnext_kr/setive_erpnext_kr/install.py) 는 Custom Field 와 Report 만 보장하고 **DocType 등재 경로가 없다.** 이 스택은 `bench migrate` 를 돌릴 수 없으므로([KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md):221) 파일만 있고 테이블이 없는 상태가 정상이 되어 버린다.
+[`install.py`](../../../setive-erpnext-kr/setive_erpnext_kr/install.py) 는 Custom Field 와 Report 만 보장하고 **DocType 등재 경로가 없다.** 이 스택은 `bench migrate` 를 돌릴 수 없으므로([KB-KOR-006](./KB-KOR-006_etax_invoice_integration.md):221) 파일만 있고 테이블이 없는 상태가 정상이 되어 버린다.
 
 Report 가 쓰는 것과 같은 트릭을 쓴다 — `reload_doc` 은 migrate 와 **같은 코드 경로**(`import_file_by_path`)를 탄다.
 
@@ -415,7 +415,7 @@ UNIQUE (provider, environment, corp_num, branch_code)
 스냅샷이 필요한 이유는 팝빌 회신 때문이다 — *"사업자 정보가 변경될 경우 파트너 계약, LinkID, API KEY 를 포함한 모든 연동 환경이 새롭게 재설정됩니다"*([KB-OPS-003](./KB-OPS-003_popbill_partner_onboarding.md):41). 현재값만 있으면 **재등록이 필요한 상태인지 알 수 없다.**
 
 구현 규칙(위반하면 무증상 실패):
-- 스냅샷은 `frappe.db.set_value(..., update_modified=False)` 로 쓴다. 기본값 `True` 면 `modified` 가 올라가 폼을 열어 둔 사용자의 다음 저장이 `TimestampMismatchError` 로 죽는다. 이 앱의 관례가 이미 그렇다([`korea/common/nts_codes.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/nts_codes.py):393-395).
+- 스냅샷은 `frappe.db.set_value(..., update_modified=False)` 로 쓴다. 기본값 `True` 면 `modified` 가 올라가 폼을 열어 둔 사용자의 다음 저장이 `TimestampMismatchError` 로 죽는다. 이 앱의 관례가 이미 그렇다([`korea/common/nts_codes.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/nts_codes.py):393-395).
 - `read_only` 는 **서버에서 강제되지 않는다.** 소비 함수 하나(`party_identity.tax_status()`)로 읽기를 통일하고, 그 함수가 권위(로그 최신 행)와 캐시를 구분한다.
 
 ---
@@ -426,7 +426,7 @@ UNIQUE (provider, environment, corp_num, branch_code)
 
 근거:
 
-1. **기존 구현이 이미 코드 방식이다.** 현재 9개 전부 [`korea/common/nts_codes.py`](../../../setive_erpnext_kr/setive_erpnext_kr/korea/common/nts_codes.py):158 의 `create_custom_fields(get_custom_fields(), update=True)` 로 만들어진다. `custom/*.json` 도 `hooks.py` 의 `fixtures` 도 부재(실측).
+1. **기존 구현이 이미 코드 방식이다.** 현재 9개 전부 [`korea/common/nts_codes.py`](../../../setive-erpnext-kr/setive_erpnext_kr/korea/common/nts_codes.py):158 의 `create_custom_fields(get_custom_fields(), update=True)` 로 만들어진다. `custom/*.json` 도 `hooks.py` 의 `fixtures` 도 부재(실측).
 2. **ERPNext 코어 자신이 코드 방식이다.** `grep -c 'fixtures' erpnext/hooks.py` → **0**. italy·uae·install.py·patches 전부 `create_custom_fields` 를 쓴다. 우리가 따르는 선례가 이미 이쪽이다.
 3. **`export_customizations` 는 사람이 UI 를 만져야 재현된다.** 에이전트도 CI 도 그 단계를 실행할 수 없다. 회수를 빠뜨린 DB 변경은 컨테이너 재생성 시 소실되고 이후 grep 으로 찾지 못한다 — CLAUDE.md 0단계가 경고하는 바로 그 위험을 **회수 단계 자체를 없앰으로써** 제거한다.
 4. **혼용하면 같은 필드가 두 소스에서 관리된다.** migrate 순서에 따라 값이 왕복하고 어느 쪽이 이겼는지 사후에 알 수 없다.
@@ -542,7 +542,7 @@ def enroll_tenant(company: str) -> EnrollResult:
 이 과제의 산출물은 **문서 1건이며 코드 파일은 만들지 않았다.** 따라서 아래 명령은 **KB-KOR-009 착수 시의 수용 게이트**다. 오늘 실행하면 "파일 없음"이 정답이다.
 
 ```bash
-APP=../setive_erpnext_kr/setive_erpnext_kr
+APP=../setive-erpnext-kr/setive_erpnext_kr
 E="$APP/korea/common/etax"
 
 # 1. 오늘 상태 — etax/ 는 아직 없어야 한다. 기대: 출력 없음(exit 1)

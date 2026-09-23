@@ -67,7 +67,7 @@ Frappe 의 `__(txt, replace, context)` 는 `frappe._messages["<msgid>:<msgctxt>"
 - **`bench update-po` 를 이 파일에 실행하지 않습니다.** babel 의 obsolete 처리로 소스에서 추출되지 않는 수동 msgid(= frappe 코어 문자열 재정의분)가 삭제됩니다.
 - 항목마다 `# 원본 위치: <경로>:<라인>` 주석을 답니다. 앱이 아니라 포크·frappe 소스를 가리키는 경우가 대부분이라 이 주석이 유일한 역참조입니다.
 - 중복 키는 만들지 않습니다 — §7 의 함정이 그대로 적용됩니다.
-- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 12블록 211엔트리(2026-09-17 기준):
+- **전역 정렬은 요구되지 않습니다.** 이 파일은 Crowdin 도 CI 도 재생성하지 않으므로 `main.pot` 과 달리 babel 정렬키에 맞출 이유가 없습니다. 대신 `# --- <제목> ---` 블록으로 묶습니다. 현재 13블록 245엔트리(2026-09-22 기준):
 
 | 블록 | 블록 내 정렬 | 내용 |
 |---|---|---|
@@ -83,6 +83,7 @@ Frappe 의 `__(txt, replace, context)` 는 `frappe._messages["<msgid>:<msgctxt>"
 | Fieldtype Select 오염 가드 | — | `msgctxt` 4건, `msgstr` 이 원문과 같음 (§10.4) |
 | 한국 세무 신원 · 폼 탭 라벨 | 폼별 | 고객·공급업체·회사 탭·섹션 라벨(폼 DocType `msgctxt`), 첫 탭 `Details`·`Connections`(무맥락), 앱 DocType·리포트 이름, Select 표시값(저장값은 그대로) — KB-KOR-003 §9.4 |
 | upstream 오역 재정의 | — | 52건. 모든 사용처가 같은 뜻인 것만 무맥락으로, 뜻이 갈리는 `Release Date` 는 폼 컨텍스트로. `Accounts` 제외, **번역문을 레코드 이름으로 쓰는 `Sales`·`Credit Note` 제외** — KB-KOR-003 §9.5 |
+| 조직 앱 메뉴 · 사이드바 공통 | 화면 등장 순 | 34건(무맥락 29 + 가드 5). 사이드바 항목(`boot.py:464` `_(item.label)`)·헤더 드롭다운(`menu.js:109` `__(item.label)`)은 **맥락 없이** 번역되므로 메뉴만 골라 바꿀 수 없다. 부작용 2종을 가드로 막았다 — `Display` 는 라벨 사용처 4곳(`DocField`·`Customize Form Field`·`System Settings`·`Workspace Sidebar Item`)에 `표시`, `Notification`·`Website`·`Workspaces` 는 형제 옵션이 미번역인 Select 3곳에 **원문 복원**(§10.4 선례). `Logout` 은 Activity Log Select 형제 `Login`·`Impersonate` 와 한 벌 |
 
 **컴파일은 [`Makefile`](../../Makefile) 의 `make po` 로 충분합니다.** `compile_translations(target_app=None, ...)` 은 `frappe.get_all_apps(True)` 를 순회하므로 앱 `ko.po` 도 함께 MO 로 컴파일됩니다(`frappe/gettext/translate.py:247-248`). 앱 하나만 좁혀 돌리려면(배포 스크립트 등, KB-OPS-001 §5.1):
 
@@ -252,6 +253,14 @@ $EXEC bench --site $SITE execute frappe.translate.get_all_translations \
 ```
 
 `Stores` 가 `백화점` 으로 나오면 앱 `ko.po` 가 로드되지 않은 것입니다 — 컴파일 대상 앱(`target_app`)과 `clear-cache` 를 먼저 확인합니다.
+
+> ⚠ **이 조회가 번역 캐시를 오염시킵니다 — 조회 뒤 `clear-cache` 를 한 번 더 실행하십시오** (2026-09-22 실측).
+> `get_all_translations(lang)` 은 병합 결과를 redis(`MERGED_TRANSLATION_KEY`)에 `lang` 별로 캐시하는데, 그 안의 국가명은
+> 인자 `lang` 이 아니라 **`frappe.local.lang`** 으로 만듭니다(`frappe/geo/country_info.py:43-55` `get_translated_countries`).
+> `bench execute` · `python -c "frappe.init(...)"` 은 `local.lang = local.conf.lang or "en"`(`frappe/__init__.py:201`)이라
+> `clear-cache` 직후 이 조회가 첫 호출이면 **ko 캐시에 영어 국가명이 박힙니다** — 화면의 국가 표시가 `대한민국` → `South Korea` 로 바뀝니다.
+> 스크립트로 조회할 때는 `frappe.local.lang = "ko"` 를 먼저 두거나, 조회 뒤 `clear-cache` 로 캐시를 비워 웹 요청이 다시 만들게 합니다.
+> KB-KOR-003 §9.5 의 번역 확인 스니펫도 같은 경로입니다.
 
 ## 9. 이전 서술 정정
 
